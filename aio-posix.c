@@ -182,6 +182,7 @@ static bool aio_epoll_check_poll(AioContext *ctx, GPollFD *pfds,
 
 #endif
 
+//查找事件源中是否已经有了该fd了
 static AioHandler *find_aio_handler(AioContext *ctx, int fd)
 {
     AioHandler *node;
@@ -195,12 +196,13 @@ static AioHandler *find_aio_handler(AioContext *ctx, int fd)
     return NULL;
 }
 
+//添加或删除事件源中的fd
 void aio_set_fd_handler(AioContext *ctx,
                         int fd,
                         bool is_external,
-                        IOHandler *io_read,
+                        IOHandler *io_read, //相关fd的回调函数
                         IOHandler *io_write,
-                        void *opaque)
+                        void *opaque)	//回调函数参数
 {
     AioHandler *node;
     bool is_new = false;
@@ -235,6 +237,7 @@ void aio_set_fd_handler(AioContext *ctx,
             node->pfd.fd = fd;
             QLIST_INSERT_HEAD(&ctx->aio_handlers, node, node);
 
+	    //glib 函数将fd加入到事件源中监听
             g_source_add_poll(&ctx->source, &node->pfd);
             is_new = true;
         }

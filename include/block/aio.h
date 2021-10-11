@@ -50,13 +50,13 @@ struct ThreadPool;
 struct LinuxAioState;
 
 struct AioContext {
-    GSource source;
+    GSource source; //参考glib库，每个自定义事件源。第一个成员必须是这个
 
     /* Protects all fields from multi-threaded access */
     QemuRecMutex lock;
 
     /* The list of registered AIO handlers */
-    QLIST_HEAD(, AioHandler) aio_handlers;
+    QLIST_HEAD(, AioHandler) aio_handlers; //所有加入到该类型事件源管理的fd的handler都挂载在这里
 
     /* This is a simple lock used to protect the aio_handlers list.
      * Specifically, it's used to ensure that no callbacks are removed while
@@ -93,7 +93,7 @@ struct AioContext {
     QemuMutex bh_lock;
 
     /* Anchor of the list of Bottom Halves belonging to the context */
-    struct QEMUBH *first_bh;
+    struct QEMUBH *first_bh; //所有跟该事件源相关的Qemu 下半部都挂载在这里, 默认是挂载到%qemu_aio_context
 
     /* A simple lock used to protect the first_bh list, and ensure that
      * no callbacks are removed while we're walking and dispatching callbacks.

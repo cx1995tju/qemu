@@ -138,6 +138,7 @@ void qemu_notify_event(void)
     qemu_bh_schedule(qemu_notify_bh);
 }
 
+//这是一个数组，保存了需要监听的fd，类型是pollfd
 static GArray *gpollfds;
 
 int qemu_init_main_loop(Error **errp)
