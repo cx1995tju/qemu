@@ -329,6 +329,7 @@ typedef void (ObjectPropertyRelease)(Object *obj,
                                      const char *name,
                                      void *opaque);
 
+//属性的本质是什么：kv对 + 解析函数(get set resolve) + 描述信息, refer to %ObjectProperty
 typedef struct ObjectProperty
 {
     gchar *name;
@@ -397,7 +398,7 @@ struct Object
     /*< private >*/
     ObjectClass *class;
     ObjectFree *free;
-    GHashTable *properties;
+    GHashTable *properties; //属性的本质是什么：kv对 + 解析函数(get set resolve) + 描述信息, refer to %ObjectProperty
     uint32_t ref;
     Object *parent;
 };
@@ -445,17 +446,17 @@ struct Object
 struct TypeInfo
 {
     const char *name;
-    const char *parent;
+    const char *parent; //父类型，描述了类型之间的继承关系
 
-    size_t instance_size;
-    void (*instance_init)(Object *obj);
+    size_t instance_size;	//该类型的实例的大小
+    void (*instance_init)(Object *obj); //该类型的实例的构造函数
     void (*instance_post_init)(Object *obj);
     void (*instance_finalize)(Object *obj);
 
     bool abstract;
     size_t class_size;
 
-    void (*class_init)(ObjectClass *klass, void *data);
+    void (*class_init)(ObjectClass *klass, void *data);	//类初始化函数, 很多在C++中编译器做的事情，这里必须自己做了
     void (*class_base_init)(ObjectClass *klass, void *data);
     void (*class_finalize)(ObjectClass *klass, void *data);
     void *class_data;

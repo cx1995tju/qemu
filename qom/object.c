@@ -42,12 +42,13 @@ struct InterfaceImpl
 
 struct TypeImpl
 {
-    const char *name;
+    const char *name; //类名字
 
-    size_t class_size;
+    size_t class_size; //类的大小
 
-    size_t instance_size;
+    size_t instance_size; //该类定义的对象的大小
 
+    //类初始化相关的函数，牢记：因为QOM的类相关概念都是运行时构建的，所以这些在c++中编译器做的事情我们必须自己做
     void (*class_init)(ObjectClass *klass, void *data);
     void (*class_base_init)(ObjectClass *klass, void *data);
     void (*class_finalize)(ObjectClass *klass, void *data);
@@ -58,21 +59,24 @@ struct TypeImpl
     void (*instance_post_init)(Object *obj);
     void (*instance_finalize)(Object *obj);
 
-    bool abstract;
+    bool abstract;	//是否是抽象类
 
-    const char *parent;
-    TypeImpl *parent_type;
+    const char *parent;	//父类名字
+    TypeImpl *parent_type; //父类是哪一个
 
-    ObjectClass *class;
+    ObjectClass *class; //指向类的一些基本信息, 在类初始化的时候，会去赋值的，如果没有赋值说明类没有初始化
+	//这些基本信息，也是按照父类的继承关系组织的，参考linux 的sock结构的层次关系。
+	//譬如： PCIDeviceClass
 
     int num_interfaces;
-    InterfaceImpl interfaces[MAX_INTERFACES];
+    InterfaceImpl interfaces[MAX_INTERFACES]; //接口类，就是c++中仅仅包含纯虚函数的抽象类, 或者就是java中的接口
 };
 
 static Type type_interface;
 
 static GHashTable *type_table_get(void)
 {
+	//注意是static的
     static GHashTable *type_table;
 
     if (type_table == NULL) {
@@ -95,6 +99,7 @@ static TypeImpl *type_table_lookup(const char *name)
     return g_hash_table_lookup(type_table_get(), name);
 }
 
+//使用TypeInfo构造与一个具体的类型, 注意不是构造对象
 static TypeImpl *type_new(const TypeInfo *info)
 {
     TypeImpl *ti = g_malloc0(sizeof(*ti));
@@ -277,12 +282,12 @@ static void type_initialize(TypeImpl *ti)
 
     parent = type_get_parent(ti);
     if (parent) {
-        type_initialize(parent);
+        type_initialize(parent); //递归方式，初始化所有父类类型
         GSList *e;
         int i;
 
         g_assert_cmpint(parent->class_size, <=, ti->class_size);
-        memcpy(ti->class, parent->class, parent->class_size);
+        memcpy(ti->class, parent->class, parent->class_size); //层次化来初始化所有Type的class成员。 妙妙妙。
         ti->class->interfaces = NULL;
         ti->class->properties = g_hash_table_new_full(
             g_str_hash, g_str_equal, g_free, object_property_free);
@@ -317,6 +322,8 @@ static void type_initialize(TypeImpl *ti)
 
     ti->class->type = ti;
 
+    //注意：前面是递归的，所以所有类的class_init class_base_init函数按照先父类后子类的顺序都会被调用的
+    //另外，注意这个函数刚进来的初始化条件，如果一个类被的init函数被调用过了就不会被调用的。
     while (parent) {
         if (parent->class_base_init) {
             parent->class_base_init(ti->class, ti->class_data);
@@ -335,6 +342,7 @@ static void object_init_with_type(Object *obj, TypeImpl *ti)
         object_init_with_type(obj, type_get_parent(ti));
     }
 
+//这里递归调用都是一个指针参数obj，但是却能一直调用到父类，显然这个obj是类似与linux sock的那种层次继承关系，我称作first-member-inherit
     if (ti->instance_init) {
         ti->instance_init(obj);
     }
@@ -642,6 +650,7 @@ out:
     return obj;
 }
 
+//只有是后代能够强行转换为祖先，这里有多态的意思了
 ObjectClass *object_class_dynamic_cast(ObjectClass *class,
                                        const char *typename)
 {
