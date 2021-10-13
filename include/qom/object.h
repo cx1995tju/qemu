@@ -339,7 +339,7 @@ typedef struct ObjectProperty
     ObjectPropertyAccessor *set;
     ObjectPropertyResolve *resolve;
     ObjectPropertyRelease *release;
-    void *opaque;
+    void *opaque; //指向某个具体的属性，譬如：BoolProperty, 可以认为这个结构就是属性的父类，或者公共部分，opaque指向的则是具体的属性。
 } ObjectProperty;
 
 /**
@@ -450,7 +450,7 @@ struct TypeInfo
 
     size_t instance_size;	//该类型的实例的大小
     void (*instance_init)(Object *obj); //该类型的实例的构造函数
-    void (*instance_post_init)(Object *obj);
+    void (*instance_post_init)(Object *obj); //对象的构造函数完成后, 做一些额外的工作
     void (*instance_finalize)(Object *obj);
 
     bool abstract;

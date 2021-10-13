@@ -338,6 +338,8 @@ static void type_initialize(TypeImpl *ti)
 
 static void object_init_with_type(Object *obj, TypeImpl *ti)
 {
+	//构造的过程是先构造祖先类，再构造子类的。这里就是递归实现的
+	//最终上溯到终极的type object
     if (type_has_parent(ti)) {
         object_init_with_type(obj, type_get_parent(ti));
     }
@@ -373,7 +375,7 @@ void object_initialize_with_type(void *data, size_t size, TypeImpl *type)
     memset(obj, 0, type->instance_size);
     obj->class = type->class;
     object_ref(obj);
-    obj->properties = g_hash_table_new_full(g_str_hash, g_str_equal,
+    obj->properties = g_hash_table_new_full(g_str_hash, g_str_equal, //搞一个hash table来保存属性咯
                                             NULL, object_property_free);
     object_init_with_type(obj, type);
     object_post_init_with_type(obj, type);
@@ -952,9 +954,9 @@ object_property_add(Object *obj, const char *name, const char *type,
     prop->get = get;
     prop->set = set;
     prop->release = release;
-    prop->opaque = opaque;
+    prop->opaque = opaque; //关键哟
 
-    g_hash_table_insert(obj->properties, prop->name, prop);
+    g_hash_table_insert(obj->properties, prop->name, prop); //关键哟, 将property插入到了object上
     return prop;
 }
 
@@ -1375,6 +1377,7 @@ static void object_finalize_child_property(Object *obj, const char *name,
     object_unref(child);
 }
 
+//必须强调，这里指的是对象的父子关系，与类的父子关系不是一回事。
 void object_property_add_child(Object *obj, const char *name,
                                Object *child, Error **errp)
 {
@@ -1390,7 +1393,7 @@ void object_property_add_child(Object *obj, const char *name,
     type = g_strdup_printf("child<%s>", object_get_typename(OBJECT(child)));
 
     op = object_property_add(obj, name, type, object_get_child_property, NULL,
-                             object_finalize_child_property, child, &local_err);
+                             object_finalize_child_property, child, &local_err); //child属性比较有意思，这里将child作为opaque传入进去了, 那么内部的ObjectProperty的opaque就会指向child，进而表达了父子关系。由于父子关系是1对多的，我们可以添加多个child属性的，最终就是体现在object的properties链上有多个child property
     if (local_err) {
         error_propagate(errp, local_err);
         goto out;
@@ -1398,7 +1401,7 @@ void object_property_add_child(Object *obj, const char *name,
 
     op->resolve = object_resolve_child_property;
     object_ref(child);
-    child->parent = obj;
+    child->parent = obj; //这里又建立了child指向parent的关系
 
 out:
     g_free(type);
@@ -1411,7 +1414,7 @@ void object_property_allow_set_link(Object *obj, const char *name,
 }
 
 typedef struct {
-    Object **child;
+    Object **child; //注意这里是二级指针
     void (*check)(Object *, const char *, Object *, Error **);
     ObjectPropertyLinkFlags flags;
 } LinkProperty;
@@ -1504,7 +1507,7 @@ static void object_set_link_property(Object *obj, Visitor *v,
     }
 
     object_ref(new_target);
-    *child = new_target;
+    *child = new_target; //最关键的地方，建立了两个对象的关系
     object_unref(old_target);
 }
 
@@ -1526,8 +1529,11 @@ static void object_release_link_property(Object *obj, const char *name,
     g_free(prop);
 }
 
+//child指向的指针，一般是obj的一个成员
+//表示obj的这个成员引用(link)了某个对象, 具体link的对象在object_set_link_property中设置, 可以动态切换的
+//不严谨的说：添加的link属性表明：obj的*child成员指针会指向一个对象，该对象被obj引用。对象的设置是动态切换的
 void object_property_add_link(Object *obj, const char *name,
-                              const char *type, Object **child,
+                              const char *type, Object **child, //注意，这里是一个child的二级指针
                               void (*check)(Object *, const char *,
                                             Object *, Error **),
                               ObjectPropertyLinkFlags flags,
@@ -1542,7 +1548,7 @@ void object_property_add_link(Object *obj, const char *name,
     prop->check = check;
     prop->flags = flags;
 
-    full_type = g_strdup_printf("link<%s>", type);
+    full_type = g_strdup_printf("link<%s>", type); //构建属性类型link<type>
 
     op = object_property_add(obj, name, full_type,
                              object_get_link_property,
@@ -1825,6 +1831,7 @@ void object_class_property_add_str(ObjectClass *klass, const char *name,
     }
 }
 
+//bool属性简单，就是一个get 一个set就可以了
 typedef struct BoolProperty
 {
     bool (*get)(Object *, Error **);
@@ -1876,7 +1883,7 @@ void object_property_add_bool(Object *obj, const char *name,
                               Error **errp)
 {
     Error *local_err = NULL;
-    BoolProperty *prop = g_malloc0(sizeof(*prop));
+    BoolProperty *prop = g_malloc0(sizeof(*prop)); //关键哟，这个就是具体的属性
 
     prop->get = get;
     prop->set = set;
