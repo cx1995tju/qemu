@@ -613,6 +613,7 @@ Object *object_dynamic_cast(Object *obj, const char *typename)
     return NULL;
 }
 
+//动态cast
 Object *object_dynamic_cast_assert(Object *obj, const char *typename,
                                    const char *file, int line, const char *func)
 {

@@ -486,7 +486,7 @@ struct TypeInfo
 
 /**
  * OBJECT_CHECK:
- * @type: The C type to use for the return value.
+ * @type: The C type to use for the return value.  //c type不是QOM 类型
  * @obj: A derivative of @type to cast.
  * @name: The QOM typename of @type
  *

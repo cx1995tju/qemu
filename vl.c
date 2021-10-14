@@ -4367,7 +4367,7 @@ int main(int argc, char **argv, char **envp)
     kernel_filename = qemu_opt_get(machine_opts, "kernel");
     initrd_filename = qemu_opt_get(machine_opts, "initrd");
     kernel_cmdline = qemu_opt_get(machine_opts, "append");
-    bios_name = qemu_opt_get(machine_opts, "firmware");
+    bios_name = qemu_opt_get(machine_opts, "firmware"); //从机器的opt中获取固件信息。固件信息的设置是在%pc_i440fx_machine_options
 
     opts = qemu_opts_find(qemu_find_opts("boot-opts"), NULL);
     if (opts) {

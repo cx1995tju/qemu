@@ -173,6 +173,8 @@ static void pc_system_flash_init(MemoryRegion *rom_memory)
     }
 }
 
+//设置rom，固件是存放在rom中的，所以固件的设置也在这里
+//将固件从文件中读出，放置在QEMU的虚拟内存，然后为其创建MemoryRegion，作为ROM MemoryRegion的子Region
 static void old_pc_system_rom_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
 {
     char *filename;
@@ -184,7 +186,7 @@ static void old_pc_system_rom_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
     if (bios_name == NULL) {
         bios_name = BIOS_FILENAME;
     }
-    filename = qemu_find_file(QEMU_FILE_TYPE_BIOS, bios_name);
+    filename = qemu_find_file(QEMU_FILE_TYPE_BIOS, bios_name); //寻找固件文件
     if (filename) {
         bios_size = get_image_size(filename);
     } else {
@@ -195,12 +197,12 @@ static void old_pc_system_rom_init(MemoryRegion *rom_memory, bool isapc_ram_fw)
         goto bios_error;
     }
     bios = g_malloc(sizeof(*bios));
-    memory_region_init_ram(bios, NULL, "pc.bios", bios_size, &error_fatal);
+    memory_region_init_ram(bios, NULL, "pc.bios", bios_size, &error_fatal);  //为BIOS准备MR
     vmstate_register_ram_global(bios);
     if (!isapc_ram_fw) {
         memory_region_set_readonly(bios, true);
     }
-    ret = rom_add_file_fixed(bios_name, (uint32_t)(-bios_size), -1);
+    ret = rom_add_file_fixed(bios_name, (uint32_t)(-bios_size), -1); //打开固件文件
     if (ret != 0) {
     bios_error:
         fprintf(stderr, "qemu: could not load PC BIOS '%s'\n", bios_name);

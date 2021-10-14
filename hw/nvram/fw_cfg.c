@@ -59,17 +59,18 @@
 
 typedef struct FWCfgEntry {
     uint32_t len;
-    uint8_t *data;
+    uint8_t *data; //数据地址
     void *callback_opaque;
     FWCfgReadCallback read_callback;
 } FWCfgEntry;
 
+//fw_cfg 的c struct，注意不是QOM 类型，QOM类型应该是TYPE_FW_CFG
 struct FWCfgState {
     /*< private >*/
     SysBusDevice parent_obj;
     /*< public >*/
 
-    FWCfgEntry entries[2][FW_CFG_MAX_ENTRY];
+    FWCfgEntry entries[2][FW_CFG_MAX_ENTRY]; //这里面也会保存files的目录数据，第一个entries与files指向一个位置, 后续的每个entry都执行files中的数据。 在FWCfgFile结构中, 不会指向具体的数据。参考 %FW_CFG_FILE_DIR
     int entry_order[FW_CFG_MAX_ENTRY];
     FWCfgFiles *files;
     uint16_t cur_entry;
@@ -759,7 +760,7 @@ void fw_cfg_add_file_callback(FWCfgState *s,  const char *filename,
     if (!s->files) {
         dsize = sizeof(uint32_t) + sizeof(FWCfgFile) * FW_CFG_FILE_SLOTS;
         s->files = g_malloc0(dsize);
-        fw_cfg_add_bytes(s, FW_CFG_FILE_DIR, s->files, dsize);
+        fw_cfg_add_bytes(s, FW_CFG_FILE_DIR, s->files, dsize); //首先在entries中添加一个files的目录
     }
 
     count = be32_to_cpu(s->files->count);
@@ -879,8 +880,9 @@ static void fw_cfg_init1(DeviceState *dev)
 
     object_property_add_child(OBJECT(machine), FW_CFG_NAME, OBJECT(s), NULL);
 
-    qdev_init_nofail(dev);
+    qdev_init_nofail(dev); //realize函数是%fw_cfg_io_realize, 参考TYPE_FW_CFG_IO 类型 的class_init函数
 
+    //下述几个数据都是约定好的索引位置
     fw_cfg_add_bytes(s, FW_CFG_SIGNATURE, (char *)"QEMU", 4);
     fw_cfg_add_bytes(s, FW_CFG_UUID, &qemu_uuid, 16);
     fw_cfg_add_i16(s, FW_CFG_NOGRAPHIC, (uint16_t)!machine->enable_graphics);
@@ -893,13 +895,14 @@ static void fw_cfg_init1(DeviceState *dev)
 }
 
 FWCfgState *fw_cfg_init_io_dma(uint32_t iobase, uint32_t dma_iobase,
-                                AddressSpace *dma_as)
+                                AddressSpace *dma_as) //dma_as 是整个虚拟机的起始地址
 {
     DeviceState *dev;
     FWCfgState *s;
     uint32_t version = FW_CFG_VERSION;
     bool dma_requested = dma_iobase && dma_as;
 
+    //创建qemu device, 类型是FW_CFG_IO, 即IO port方式与虚拟机交互的fw_cfg
     dev = qdev_create(NULL, TYPE_FW_CFG_IO);
     qdev_prop_set_uint32(dev, "iobase", iobase);
     qdev_prop_set_uint32(dev, "dma_iobase", dma_iobase);
@@ -907,6 +910,7 @@ FWCfgState *fw_cfg_init_io_dma(uint32_t iobase, uint32_t dma_iobase,
         qdev_prop_set_bit(dev, "dma_enabled", false);
     }
 
+    //初始化设备，包括realized 该设备(调用qdev_init_nofail)
     fw_cfg_init1(dev);
     s = FW_CFG(dev);
 
@@ -918,6 +922,7 @@ FWCfgState *fw_cfg_init_io_dma(uint32_t iobase, uint32_t dma_iobase,
         version |= FW_CFG_VERSION_DMA;
     }
 
+    //首先将fw_cfg的版本信息增加到fw_cfg中
     fw_cfg_add_i32(s, FW_CFG_ID, version);
 
     return s;
@@ -1002,6 +1007,7 @@ static Property fw_cfg_io_properties[] = {
     DEFINE_PROP_END_OF_LIST(),
 };
 
+//分配fw_cfg需要的io 端口, 并将其加入MemroyRegion系统管理
 static void fw_cfg_io_realize(DeviceState *dev, Error **errp)
 {
     FWCfgIoState *s = FW_CFG_IO(dev);

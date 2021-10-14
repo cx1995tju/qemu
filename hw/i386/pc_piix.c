@@ -65,6 +65,7 @@ static const int ide_irq[MAX_IDE_BUS] = { 14, 15 };
 static void pc_init1(MachineState *machine,
                      const char *host_type, const char *pci_type)
 {
+	//pcms 显然是machine的子类的对象
     PCMachineState *pcms = PC_MACHINE(machine);
     PCMachineClass *pcmc = PC_MACHINE_GET_CLASS(pcms);
     MemoryRegion *system_memory = get_system_memory();
@@ -213,7 +214,7 @@ static void pc_init1(MachineState *machine,
     } else if (xen_enabled()) {
         i8259 = xen_interrupt_controller_init();
     } else {
-        i8259 = i8259_init(isa_bus, pc_allocate_cpu_irq());
+        i8259 = i8259_init(isa_bus, pc_allocate_cpu_irq()); //主板初始化完成后，创建初始化8259中断控制器
     }
 
     for (i = 0; i < ISA_NUM_IRQS; i++) {
@@ -226,6 +227,7 @@ static void pc_init1(MachineState *machine,
 
     pc_register_ferr_irq(pcms->gsi[13]);
 
+    //后续进行各种基本设备的初始化，譬如vga等
     pc_vga_init(isa_bus, pcmc->pci_enabled ? pci_bus : NULL);
 
     assert(pcms->vmport != ON_OFF_AUTO__MAX);
@@ -237,9 +239,9 @@ static void pc_init1(MachineState *machine,
     pc_basic_device_init(isa_bus, pcms->gsi, &rtc_state, true,
                          (pcms->vmport != ON_OFF_AUTO_ON), 0x4);
 
-    pc_nic_init(isa_bus, pci_bus);
+    pc_nic_init(isa_bus, pci_bus); //nic初始化
 
-    ide_drive_get(hd, ARRAY_SIZE(hd));
+    ide_drive_get(hd, ARRAY_SIZE(hd)); //ide控制器
     if (pcmc->pci_enabled) {
         PCIDevice *dev;
         if (xen_enabled()) {

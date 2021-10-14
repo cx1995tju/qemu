@@ -743,6 +743,7 @@ static FWCfgState *bochs_bios_init(AddressSpace *as, PCMachineState *pcms)
     uint64_t *numa_fw_cfg;
     int i, j;
 
+    //0x510~0x511两个端口用于fw_cfg的普通控制，0x514~0x51b 8个端口用于DMA控制
     fw_cfg = fw_cfg_init_io_dma(FW_CFG_IO_BASE, FW_CFG_IO_BASE + 4, as);
     fw_cfg_add_i16(fw_cfg, FW_CFG_NB_CPUS, pcms->boot_cpus);
 

@@ -6,9 +6,9 @@
 
 typedef struct FWCfgFile {
     uint32_t  size;        /* file size */
-    uint16_t  select;      /* write this to 0x510 to read it */
+    uint16_t  select;      /* write this to 0x510 to read it */ //file的实际内容还是存储在FWCfgState的entries中的，这个select就用来指向entries的
     uint16_t  reserved;
-    char      name[FW_CFG_MAX_FILE_PATH];
+    char      name[FW_CFG_MAX_FILE_PATH]; //文件名字
 } FWCfgFile;
 
 #define FW_CFG_ORDER_OVERRIDE_VGA    70
@@ -20,8 +20,8 @@ void fw_cfg_set_order_override(FWCfgState *fw_cfg, int order);
 void fw_cfg_reset_order_override(FWCfgState *fw_cfg);
 
 typedef struct FWCfgFiles {
-    uint32_t  count;
-    FWCfgFile f[];
+    uint32_t  count; //表示文件的数目
+    FWCfgFile f[]; //表示文件
 } FWCfgFiles;
 
 /* Control as first field allows for different structures selected by this

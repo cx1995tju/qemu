@@ -296,16 +296,18 @@ static void i440fx_pcihost_initfn(Object *obj)
                         NULL, NULL, NULL, NULL);
 }
 
+//主桥芯片PCIHOST的realized函数，参见QEMU主板架构图
 static void i440fx_pcihost_realize(DeviceState *dev, Error **errp)
 {
     PCIHostState *s = PCI_HOST_BRIDGE(dev);
     SysBusDevice *sbd = SYS_BUS_DEVICE(dev);
 
+    //添加，并初始化主桥的两个寄存器, 配置地址寄存器 和 配置数据寄存器. 就是pci总线的两个port
     sysbus_add_io(sbd, 0xcf8, &s->conf_mem);
-    sysbus_init_ioports(sbd, 0xcf8, 4);
+    sysbus_init_ioports(sbd, 0xcf8, 4); //0xcf8开始的4个port 
 
     sysbus_add_io(sbd, 0xcfc, &s->data_mem);
-    sysbus_init_ioports(sbd, 0xcfc, 4);
+    sysbus_init_ioports(sbd, 0xcfc, 4); //0xcfc开始的4个port
 }
 
 static void i440fx_realize(PCIDevice *dev, Error **errp)
@@ -334,24 +336,26 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
     PCIDevice *d;
     PCIHostState *s;
     PIIX3State *piix3;
-    PCII440FXState *f;
+    PCII440FXState *f; //对应主桥在PCI根总线的角色,因为主桥也是根PCI总线上的一个设备的。
     unsigned i;
-    I440FXState *i440fx;
+    I440FXState *i440fx; //代表的是主桥对应的设备
 
+    //首先创建主桥(北桥)芯片, host_type是其设备类型的名字。pci_type对应主桥在pci根总线上的名字
     dev = qdev_create(NULL, host_type);
     s = PCI_HOST_BRIDGE(dev);
-    b = pci_bus_new(dev, NULL, pci_address_space,
+    b = pci_bus_new(dev, NULL, pci_address_space, //主桥上创建了一个pci根总线
                     address_space_io, 0, TYPE_PCI_BUS);
     s->bus = b;
-    object_property_add_child(qdev_get_machine(), "i440fx", OBJECT(dev), NULL);
-    qdev_init_nofail(dev);
+    object_property_add_child(qdev_get_machine(), "i440fx", OBJECT(dev), NULL); //将主桥芯片加入到machine中
+    qdev_init_nofail(dev); //realized(具现化) 主桥芯片， 其realized函数是%i440fx_pcihost_realize
 
+    //主桥芯片除了连接在系统总线，供根pci bus挂载。同时其也是作为根pci总线的一个设备的角色，这部分就是初始化其作为pci设备的部分。
     d = pci_create_simple(b, 0, pci_type);
     *pi440fx_state = I440FX_PCI_DEVICE(d);
     f = *pi440fx_state;
-    f->system_memory = address_space_mem;
-    f->pci_address_space = pci_address_space;
-    f->ram_memory = ram_memory;
+    f->system_memory = address_space_mem; //系统内存的memory region
+    f->pci_address_space = pci_address_space; //pci地址空间
+    f->ram_memory = ram_memory; //ram内存
 
     i440fx = I440FX_PCI_HOST_BRIDGE(dev);
     range_set_bounds(&i440fx->pci_hole, below_4g_mem_size,
@@ -361,6 +365,7 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
     pc_pci_as_mapping_init(OBJECT(f), f->system_memory,
                            f->pci_address_space);
 
+    //创建并初始化各种MemoryRegion，因为北桥的一个重要功能就是连接内存的
     /* if *disabled* show SMRAM to all CPUs */
     memory_region_init_alias(&f->smram_region, OBJECT(d), "smram-region",
                              f->pci_address_space, 0xa0000, 0x20000);
@@ -398,7 +403,7 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
                 piix3, XEN_PIIX_NUM_PIRQS);
     } else {
         PCIDevice *pci_dev = pci_create_simple_multifunction(b,
-                             -1, true, "PIIX3");
+                             -1, true, "PIIX3"); //创建piix3设备, 设置中断路由等信息，参考QEMU主板的架构图，发现IO APIC是连接在南桥piix3设备上
         piix3 = PIIX3_PCI_DEVICE(pci_dev);
         pci_bus_irqs(b, piix3_set_irq, pci_slot_get_pirq, piix3,
                 PIIX_NUM_PIRQS);

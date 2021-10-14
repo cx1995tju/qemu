@@ -110,6 +110,7 @@ void qdev_set_parent_bus(DeviceState *dev, BusState *bus)
 /* Create a new device.  This only initializes the device state
    structure and allows properties to be set.  The device still needs
    to be realized.  See qdev-core.h.  */
+//第一个参数表示设备所属bus，如果是NULL， 表示系统总线, 即设备会被挂载在系统总线
 DeviceState *qdev_create(BusState *bus, const char *name)
 {
     DeviceState *dev;
