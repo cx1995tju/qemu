@@ -866,6 +866,7 @@ static void dummy_signal(int sig)
 {
 }
 
+//初始化CPU的信号处理，从而让CPU线程能够处理IPI信号
 static void qemu_kvm_init_cpu_signals(CPUState *cpu)
 {
     int r;
@@ -994,7 +995,7 @@ static void *qemu_kvm_cpu_thread_fn(void *arg)
     qemu_cond_signal(&qemu_cpu_cond);
 
     do {
-        if (cpu_can_run(cpu)) {
+        if (cpu_can_run(cpu)) { //判断cpu能否运行
             r = kvm_cpu_exec(cpu);
             if (r == EXCP_DEBUG) {
                 cpu_handle_guest_debug(cpu);
@@ -1428,7 +1429,7 @@ static void qemu_kvm_start_vcpu(CPUState *cpu)
     snprintf(thread_name, VCPU_THREAD_NAME_SIZE, "CPU %d/KVM",
              cpu->cpu_index);
     qemu_thread_create(cpu->thread, thread_name, qemu_kvm_cpu_thread_fn,
-                       cpu, QEMU_THREAD_JOINABLE);
+                       cpu, QEMU_THREAD_JOINABLE); //为每个cpu对象创建一个线程, 线程名字CPU %d/KVM
     while (!cpu->created) {
         qemu_cond_wait(&qemu_cpu_cond, &qemu_global_mutex);
     }
@@ -1450,9 +1451,10 @@ static void qemu_dummy_start_vcpu(CPUState *cpu)
     }
 }
 
+//根据QEMU使用的加速器来执行对应的CPU的初始化函数, %qemu_kvm_start_vcpu
 void qemu_init_vcpu(CPUState *cpu)
 {
-    cpu->nr_cores = smp_cores;
+    cpu->nr_cores = smp_cores; //根据全局变量记录CPU核心和线程数目
     cpu->nr_threads = smp_threads;
     cpu->stopped = true;
 
@@ -1460,7 +1462,7 @@ void qemu_init_vcpu(CPUState *cpu)
         /* If the target cpu hasn't set up any address spaces itself,
          * give it the default one.
          */
-        AddressSpace *as = address_space_init_shareable(cpu->memory,
+        AddressSpace *as = address_space_init_shareable(cpu->memory, //创建CPU视角的地址空间
                                                         "cpu-memory");
         cpu->num_ases = 1;
         cpu_address_space_init(cpu, as, 0);

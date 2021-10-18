@@ -63,11 +63,11 @@ static int accel_init_machine(AccelClass *acc, MachineState *ms)
 {
     ObjectClass *oc = OBJECT_CLASS(acc);
     const char *cname = object_class_get_name(oc);
-    AccelState *accel = ACCEL(object_new(cname));
+    AccelState *accel = ACCEL(object_new(cname)); //创建一个新的accel对象，仍然注意区分c tyep和QOM 类型的区别
     int ret;
     ms->accelerator = accel;
     *(acc->allowed) = true;
-    ret = acc->init_machine(ms);
+    ret = acc->init_machine(ms); //%kvm-all.c:kvm_init, 具体是什么，取决于具体的accelrator, 在TYPE_KVM_ACCEL的类初始化函数中设置的
     if (ret < 0) {
         ms->accelerator = NULL;
         *(acc->allowed) = false;

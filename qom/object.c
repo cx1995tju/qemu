@@ -276,7 +276,7 @@ static void type_initialize(TypeImpl *ti)
     }
 
     ti->class_size = type_class_get_size(ti);
-    ti->instance_size = type_object_get_size(ti);
+    ti->instance_size = type_object_get_size(ti); //如果没有设置instance_size, 那么就等于父亲的instance size
 
     ti->class = g_malloc0(ti->class_size);
 
@@ -286,8 +286,8 @@ static void type_initialize(TypeImpl *ti)
         GSList *e;
         int i;
 
-        g_assert_cmpint(parent->class_size, <=, ti->class_size);
-        memcpy(ti->class, parent->class, parent->class_size); //层次化来初始化所有Type的class成员。 妙妙妙。
+        g_assert_cmpint(parent->class_size, <=, ti->class_size); //父亲类型，不应该大于子类型的
+        memcpy(ti->class, parent->class, parent->class_size); //层次化来初始化所有Type的class成员。 妙妙妙。 一层一层的将祖先的class信息copy下来
         ti->class->interfaces = NULL;
         ti->class->properties = g_hash_table_new_full(
             g_str_hash, g_str_equal, g_free, object_property_free);
@@ -332,7 +332,7 @@ static void type_initialize(TypeImpl *ti)
     }
 
     if (ti->class_init) {
-        ti->class_init(ti->class, ti->class_data);
+        ti->class_init(ti->class, ti->class_data); //类型初始化，本质也就是1.分配class结构（从祖先到后代的顺序）2. 执行一个class_init函数(从祖先到父亲的顺序)了并记录下是否初始化的信息
     }
 }
 

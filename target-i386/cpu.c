@@ -2327,6 +2327,7 @@ static void x86_cpu_load_def(X86CPU *cpu, X86CPUDefinition *def, Error **errp)
     FeatureWord w;
 
     /* CPU models only set _minimum_ values for level/xlevel: */
+    //设置CPUID的最小功能号，和最小扩展功能号
     object_property_set_int(OBJECT(cpu), def->level, "min-level", errp);
     object_property_set_int(OBJECT(cpu), def->xlevel, "min-xlevel", errp);
 
@@ -2334,12 +2335,12 @@ static void x86_cpu_load_def(X86CPU *cpu, X86CPUDefinition *def, Error **errp)
     object_property_set_int(OBJECT(cpu), def->model, "model", errp);
     object_property_set_int(OBJECT(cpu), def->stepping, "stepping", errp);
     object_property_set_str(OBJECT(cpu), def->model_id, "model-id", errp);
-    for (w = 0; w < FEATURE_WORDS; w++) {
+    for (w = 0; w < FEATURE_WORDS; w++) { //命令行指定的CPU 模型的特性复制到该数组中
         env->features[w] = def->features[w];
     }
 
     /* Special cases not set in the X86CPUDefinition structs: */
-    if (kvm_enabled()) {
+    if (kvm_enabled()) { //设置一些KVM特有的属性
         if (!kvm_irqchip_in_kernel()) {
             x86_cpu_change_kvm_default("x2apic", "off");
         }
@@ -2802,6 +2803,9 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
 }
 
 /* CPUClass::reset() */
+//注释是对x86CPU对象的状态做一些初始化设置
+//设置各种寄存器
+//最后调用kvm层面的reset
 static void x86_cpu_reset(CPUState *s)
 {
     X86CPU *cpu = X86_CPU(s);
@@ -3113,6 +3117,7 @@ static void x86_cpu_enable_xsave_components(X86CPU *cpu)
 }
 
 /* Load CPUID data based on configured features */
+//根据QEMU命令行解析出来的CPU特性对CPU对象实例中的属性设置true 或者 false
 static void x86_cpu_load_features(X86CPU *cpu, Error **errp)
 {
     CPUX86State *env = &cpu->env;
@@ -3217,12 +3222,12 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
         return;
     }
 
-    x86_cpu_load_features(cpu, &local_err);
+    x86_cpu_load_features(cpu, &local_err); //根据QEMU命令行解析出来的CPU特性对CPU对象实例中的属性设置true 或者 false
     if (local_err) {
         goto out;
     }
 
-    if (x86_cpu_filter_features(cpu) &&
+    if (x86_cpu_filter_features(cpu) && //检测宿主机CPU特性能否支持创建的CPU对象, 显然如果宿主机是奔腾，那么就无法拥有酷睿cpu的属性
         (cpu->check_cpuid || cpu->enforce_cpuid)) {
         x86_cpu_report_filtered_features(cpu);
         if (cpu->enforce_cpuid) {
@@ -3307,7 +3312,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
             cpu->phys_bits = 32;
         }
     }
-    cpu_exec_realizefn(cs, &local_err);
+    cpu_exec_realizefn(cs, &local_err); //将这个正在初始化的CPU添加到一个全局的cpu链表cpus
     if (local_err != NULL) {
         error_propagate(errp, local_err);
         return;
@@ -3321,7 +3326,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
     qemu_register_reset(x86_cpu_machine_reset_cb, cpu);
 
     if (cpu->env.features[FEAT_1_EDX] & CPUID_APIC || smp_cpus > 1) {
-        x86_cpu_apic_create(cpu, &local_err);
+        x86_cpu_apic_create(cpu, &local_err); //创建lapic中断控制器, 每个CPU都有一个
         if (local_err != NULL) {
             goto out;
         }
@@ -3358,7 +3363,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
     }
 #endif
 
-    qemu_init_vcpu(cs);
+    qemu_init_vcpu(cs); //根据QEMU使用的加速器来执行对应的CPU的初始化函数, %qemu_kvm_start_vcpu
 
     /* Only Intel CPUs support hyperthreading. Even though QEMU fixes this
      * issue by adjusting CPUID_0000_0001_EBX and CPUID_8000_0008_ECX
@@ -3374,13 +3379,13 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
         ht_warned = true;
     }
 
-    x86_cpu_apic_realize(cpu, &local_err);
+    x86_cpu_apic_realize(cpu, &local_err); //具现化 lapic
     if (local_err != NULL) {
         goto out;
     }
-    cpu_reset(cs);
+    cpu_reset(cs); //进行cpu reset, %x86_cpu_reset
 
-    xcc->parent_realize(dev, &local_err);
+    xcc->parent_realize(dev, &local_err); //最后调用父亲的realize函数，cpu_common_realizefn
 
 out:
     if (local_err != NULL) {
@@ -3519,8 +3524,9 @@ static void x86_cpu_initfn(Object *obj)
     CPUX86State *env = &cpu->env;
     FeatureWord w;
 
-    cs->env_ptr = env;
+    cs->env_ptr = env; //设置env指针
 
+    //添加各种属性, 都是CPU的一些基本信息
     object_property_add(obj, "family", "int",
                         x86_cpuid_version_get_family,
                         x86_cpuid_version_set_family, NULL, NULL, NULL);
@@ -3552,10 +3558,11 @@ static void x86_cpu_initfn(Object *obj)
         int bitnr;
 
         for (bitnr = 0; bitnr < 32; bitnr++) {
-            x86_cpu_register_feature_bit_props(cpu, w, bitnr);
+            x86_cpu_register_feature_bit_props(cpu, w, bitnr); //添加CPU的属性作为特性
         }
     }
 
+    //为一些属性创建别名
     object_property_add_alias(obj, "sse3", obj, "pni", &error_abort);
     object_property_add_alias(obj, "pclmuldq", obj, "pclmulqdq", &error_abort);
     object_property_add_alias(obj, "sse4-1", obj, "sse4.1", &error_abort);
@@ -3586,6 +3593,7 @@ static void x86_cpu_initfn(Object *obj)
     object_property_add_alias(obj, "sse4_1", obj, "sse4.1", &error_abort);
     object_property_add_alias(obj, "sse4_2", obj, "sse4.2", &error_abort);
 
+    //根据指定的CPU模型，设置一些属性
     x86_cpu_load_def(cpu, xcc->cpu_def, &error_abort);
 }
 
@@ -3683,9 +3691,9 @@ static void x86_cpu_common_class_init(ObjectClass *oc, void *data)
     CPUClass *cc = CPU_CLASS(oc);
     DeviceClass *dc = DEVICE_CLASS(oc);
 
-    xcc->parent_realize = dc->realize;
+    xcc->parent_realize = dc->realize; //cpu_class_init中设置dc->realize了其为cpu_common_realizefn
     xcc->parent_unrealize = dc->unrealize;
-    dc->realize = x86_cpu_realizefn;
+    dc->realize = x86_cpu_realizefn; //修改了dc->realize。在realize的时候，由于这个dc被修改了，所以执行祖先类型的realize函数的时候，实质是执行了其自类型的x86_cpu_realizefn函数
     dc->unrealize = x86_cpu_unrealizefn;
     dc->props = x86_cpu_properties;
 
@@ -3732,7 +3740,7 @@ static void x86_cpu_common_class_init(ObjectClass *oc, void *data)
 static const TypeInfo x86_cpu_type_info = {
     .name = TYPE_X86_CPU,
     .parent = TYPE_CPU,
-    .instance_size = sizeof(X86CPU),
+    .instance_size = sizeof(X86CPU), //这个结构才是该QOM类型对应的真正的c类型
     .instance_init = x86_cpu_initfn,
     .abstract = true,
     .class_size = sizeof(X86CPUClass),

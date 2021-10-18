@@ -299,7 +299,7 @@ struct qemu_work_item;
  *
  * State of one CPU core or thread.
  */
-struct CPUState {
+struct CPUState { //存储一些CPU相关的通用信息，参考 %X86CPU
     /*< private >*/
     DeviceState parent_obj;
     /*< public >*/
@@ -336,7 +336,7 @@ struct CPUState {
     AddressSpace *as;
     MemoryRegion *memory;
 
-    void *env_ptr; /* CPUArchState */
+    void *env_ptr; /* CPUArchState */ //指向其之类的env成员，譬如：X86CPU
 
     /* Writes protected by tb_lock, reads not thread-safe  */
     struct TranslationBlock *tb_jmp_cache[TB_JMP_CACHE_SIZE];

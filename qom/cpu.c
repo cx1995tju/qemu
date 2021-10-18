@@ -353,7 +353,7 @@ static void cpu_common_unrealizefn(DeviceState *dev, Error **errp)
 
 static void cpu_common_initfn(Object *obj)
 {
-    CPUState *cpu = CPU(obj);
+    CPUState *cpu = CPU(obj); //这个指针才是TYPE_CPU QOM类型对应的C类型
     CPUClass *cc = CPU_GET_CLASS(obj);
 
     cpu->cpu_index = UNASSIGNED_CPU_INDEX;

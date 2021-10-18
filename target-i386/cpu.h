@@ -972,6 +972,7 @@ typedef enum TPRAccess {
     TPR_ACCESS_WRITE,
 } TPRAccess;
 
+//各种X86 CPU的结构，譬如：各种寄存器
 typedef struct CPUX86State {
     /* standard registers */
     target_ulong regs[CPU_NB_REGS];
@@ -1182,12 +1183,13 @@ struct kvm_msrs;
  *
  * An x86 CPU.
  */
+//QOM类型 TYPE_X86_CPU对应的真正的C类型
 struct X86CPU {
     /*< private >*/
-    CPUState parent_obj;
+    CPUState parent_obj; //继承关系在C类型上的体现
     /*< public >*/
 
-    CPUX86State env;
+    CPUX86State env; //各种X86 CPU的结构，譬如：各种寄存器, 中断异常信息等
 
     bool hyperv_vapic;
     bool hyperv_relaxed_timing;
@@ -1200,18 +1202,18 @@ struct X86CPU {
     bool hyperv_runtime;
     bool hyperv_synic;
     bool hyperv_stimer;
-    bool check_cpuid;
-    bool enforce_cpuid;
+    bool check_cpuid; //QEMU命令行来指示是否需要检测CPUID
+    bool enforce_cpuid;//QEMU命令行来指示是否需要检测CPUID
     bool expose_kvm;
     bool migratable;
     bool host_features;
-    uint32_t apic_id;
+    uint32_t apic_id; //该CPU对应的LAPIC的id
 
     /* if true the CPUID code directly forward host cache leaves to the guest */
     bool cache_info_passthrough;
 
     /* Features that were filtered out because of missing host capabilities */
-    uint32_t filtered_features[FEATURE_WORDS];
+    uint32_t filtered_features[FEATURE_WORDS]; //表示被过滤的特性
 
     /* Enable PMU CPUID bits. This can't be enabled by default yet because
      * it doesn't have ABI stability guarantees, as it passes all PMU CPUID
@@ -1255,7 +1257,7 @@ struct X86CPU {
 
     struct kvm_msrs *kvm_msr_buf;
 
-    int32_t socket_id;
+    int32_t socket_id; //该CPU在系统的拓扑信息
     int32_t core_id;
     int32_t thread_id;
 };

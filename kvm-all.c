@@ -1574,7 +1574,7 @@ static int kvm_init(MachineState *ms)
         { NULL, }
     }, *nc = num_cpus;
     int soft_vcpus_limit, hard_vcpus_limit;
-    KVMState *s;
+    KVMState *s; //QEMU维护的一个关于KVM的context
     const KVMCapabilityInfo *missing_cap;
     int ret;
     int type = 0;
@@ -1597,7 +1597,7 @@ static int kvm_init(MachineState *ms)
 #endif
     QLIST_INIT(&s->kvm_parked_vcpus);
     s->vmfd = -1;
-    s->fd = qemu_open("/dev/kvm", O_RDWR);
+    s->fd = qemu_open("/dev/kvm", O_RDWR); //打开kvm的接口，后续基于此与kvm交互
     if (s->fd == -1) {
         fprintf(stderr, "Could not access KVM kernel module: %m\n");
         ret = -errno;
@@ -1657,7 +1657,7 @@ static int kvm_init(MachineState *ms)
     }
 
     do {
-        ret = kvm_ioctl(s, KVM_CREATE_VM, type);
+        ret = kvm_ioctl(s, KVM_CREATE_VM, type); //准备好了，可以创建虚拟机了
     } while (ret == -EINTR);
 
     if (ret < 0) {
@@ -1752,7 +1752,7 @@ static int kvm_init(MachineState *ms)
         kvm_irqchip_create(ms, s);
     }
 
-    kvm_state = s;
+    kvm_state = s; //最后将s保存起来
 
     if (kvm_eventfds_allowed) {
         s->memory_listener.listener.eventfd_add = kvm_mem_ioeventfd_add;
@@ -1926,7 +1926,7 @@ int kvm_cpu_exec(CPUState *cpu)
             qemu_cpu_kick_self();
         }
 
-        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);
+        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);  //调用这个函数就陷入内核，应用层的函数就阻塞在这里, 产生EXIT的时候就返回，然后去handle各种事件
 
         attrs = kvm_arch_post_run(cpu, run);
 
