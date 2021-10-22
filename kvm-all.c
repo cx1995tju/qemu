@@ -1915,6 +1915,7 @@ int kvm_cpu_exec(CPUState *cpu)
             cpu->kvm_vcpu_dirty = false;
         }
 
+	//运行前准备，譬如：nmi smi中断的注入
         kvm_arch_pre_run(cpu, run);
         if (cpu->exit_request) {
             DPRINTF("interrupt exit requested\n");
@@ -1926,8 +1927,9 @@ int kvm_cpu_exec(CPUState *cpu)
             qemu_cpu_kick_self();
         }
 
-        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);  //调用这个函数就陷入内核，应用层的函数就阻塞在这里, 产生EXIT的时候就返回，然后去handle各种事件
+        run_ret = kvm_vcpu_ioctl(cpu, KVM_RUN, 0);  //调用这个函数就陷入内核，应用层的函数就阻塞在这里, 产生EXIT的时候就返回，然后去handle各种事件, 进入内核的KVM模块后，其会执行相应的VMX指令，然后就陷入non-root模式。KVM侧核心函数vcpu_run
 
+	//这里初步处理事件
         attrs = kvm_arch_post_run(cpu, run);
 
         if (run_ret < 0) {
@@ -1950,12 +1952,13 @@ int kvm_cpu_exec(CPUState *cpu)
             break;
         }
 
+	//vm-exit后，kvm处理不了的事情，qemu来handle
         trace_kvm_run_exit(cpu->cpu_index, run->exit_reason);
-        switch (run->exit_reason) {
+        switch (run->exit_reason) { //根据kvm_run来判断原因
         case KVM_EXIT_IO:
             DPRINTF("handle_io\n");
             /* Called outside BQL */
-            kvm_handle_io(run->io.port, attrs,
+            kvm_handle_io(run->io.port, attrs, //回调各种IO处理的函数
                           (uint8_t *)run + run->io.data_offset,
                           run->io.direction,
                           run->io.size,

@@ -1097,7 +1097,7 @@ static X86CPU *pc_new_cpu(const char *typename, int64_t apic_id,
     cpu = X86_CPU(object_new(typename));
 
     object_property_set_int(OBJECT(cpu), apic_id, "apic-id", &local_err);
-    object_property_set_bool(OBJECT(cpu), true, "realized", &local_err);
+    object_property_set_bool(OBJECT(cpu), true, "realized", &local_err); //realize it???
 
     if (local_err) {
         error_propagate(errp, local_err);
@@ -1169,7 +1169,7 @@ void pc_cpus_init(PCMachineState *pcms)
     }
     typename = object_class_get_name(oc);
     cc = CPU_CLASS(oc);
-    cc->parse_features(typename, model_pieces[1], &error_fatal);
+    cc->parse_features(typename, model_pieces[1], &error_fatal); //%x86_cpu_parse_featurestr
     g_strfreev(model_pieces);
 
     /* Calculates the limit to CPU APIC ID values

@@ -962,7 +962,8 @@ static void qemu_tcg_wait_io_event(CPUState *cpu)
 static void qemu_kvm_wait_io_event(CPUState *cpu)
 {
     while (cpu_thread_is_idle(cpu)) {
-        qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex);
+        qemu_cond_wait(cpu->halt_cond, &qemu_global_mutex); //在这里等待条件变量并睡眠。
+	//vm_start -> resume_all_vcpus -> cpu_resume -> qemu_cpu_kick 中会唤醒
     }
 
     qemu_kvm_eat_signals(cpu);
@@ -982,7 +983,7 @@ static void *qemu_kvm_cpu_thread_fn(void *arg)
     cpu->can_do_io = 1;
     current_cpu = cpu;
 
-    r = kvm_init_vcpu(cpu);
+    r = kvm_init_vcpu(cpu); //创建CPU, KVM侧
     if (r < 0) {
         fprintf(stderr, "kvm_init_vcpu failed: %s\n", strerror(-r));
         exit(1);
@@ -996,7 +997,7 @@ static void *qemu_kvm_cpu_thread_fn(void *arg)
 
     do {
         if (cpu_can_run(cpu)) { //判断cpu能否运行
-            r = kvm_cpu_exec(cpu);
+            r = kvm_cpu_exec(cpu); //运行CPU， 进入KVM侧
             if (r == EXCP_DEBUG) {
                 cpu_handle_guest_debug(cpu);
             }

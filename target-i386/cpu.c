@@ -1996,6 +1996,11 @@ static gint compare_string(gconstpointer a, gconstpointer b)
 }
 
 /* Parse "+feature,-feature,feature=foo" CPU feature string
+ *
+ * 1. -cpu参数一般是上面这种形式
+ * 2. +feature 表示将其加入到plus_feature链表
+ * 3. -feature 表示将其加入到minus_feature链表, 在后续realize的时候，会将对应feature设置为true或者false
+ * 4. feature=foo, 会设置CPU的其他特性，譬如vendor, 这里使用qdev_prop_register_global将其加入到一个全局链表global_props中, 随后在调用qdev_prop_set_globals函数的时候会设置对应的属性
  */
 static void x86_cpu_parse_featurestr(const char *typename, char *features,
                                      Error **errp)
@@ -2407,6 +2412,11 @@ void cpu_clear_apic_feature(CPUX86State *env)
 
 #endif /* !CONFIG_USER_ONLY */
 
+//env是X86CPU的env成员
+//index是CPUID的主功能号
+//count是子功能号
+//4个寄存器用于返回CPUID的数据，QEMU获得后，将其保存struct cpuid_data，最后传递给KVM
+//说到底：CPUID的数据就是来自于env咯
 void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
                    uint32_t *eax, uint32_t *ebx,
                    uint32_t *ecx, uint32_t *edx)
@@ -2417,7 +2427,7 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
 
     /* test if maximum index reached */
     if (index & 0x80000000) {
-        if (index > env->cpuid_xlevel) {
+        if (index > env->cpuid_xlevel) { //最大扩展功能号
             if (env->cpuid_xlevel2 > 0) {
                 /* Handle the Centaur's CPUID instruction. */
                 if (index > env->cpuid_xlevel2) {
@@ -2430,7 +2440,7 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
                  * return the same information as EAX=cpuid_level
                  * (Intel SDM Vol. 2A - Instruction Set Reference - CPUID)
                  */
-                index =  env->cpuid_level;
+                index =  env->cpuid_level; //最大基础功能号
             }
         }
     } else {
@@ -2438,6 +2448,7 @@ void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
             index = env->cpuid_level;
     }
 
+    //根据主功能号，case by case的处理
     switch(index) {
     case 0:
         *eax = env->cpuid_level;

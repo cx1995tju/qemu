@@ -206,10 +206,10 @@ struct kvm_cpuid {
 };
 
 struct kvm_cpuid_entry2 {
-	__u32 function;
-	__u32 index;
-	__u32 flags;
-	__u32 eax;
+	__u32 function; //主功能号
+	__u32 index;	//子功能号
+	__u32 flags; //这项数据的一些属性,%KVM_CPUID_FLAG_SIGNIFCANT_INDEX, 表示index这一项有效
+	__u32 eax; //该项对应的具体数据
 	__u32 ebx;
 	__u32 ecx;
 	__u32 edx;
@@ -222,9 +222,9 @@ struct kvm_cpuid_entry2 {
 
 /* for KVM_SET_CPUID2 */
 struct kvm_cpuid2 {
-	__u32 nent;
+	__u32 nent; //entries的数目
 	__u32 padding;
-	struct kvm_cpuid_entry2 entries[0];
+	struct kvm_cpuid_entry2 entries[0]; //每个entries表示一项CPUID数据
 };
 
 /* for KVM_GET_PIT and KVM_SET_PIT */

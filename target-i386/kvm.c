@@ -693,7 +693,7 @@ int kvm_arch_init_vcpu(CPUState *cs)
     struct {
         struct kvm_cpuid2 cpuid;
         struct kvm_cpuid_entry2 entries[KVM_MAX_CPUID_ENTRIES];
-    } QEMU_PACKED cpuid_data;
+    } QEMU_PACKED cpuid_data; //保存cpuid数据
     X86CPU *cpu = X86_CPU(cs);
     CPUX86State *env = &cpu->env;
     uint32_t limit, i, j, cpuid_i;
@@ -707,6 +707,8 @@ int kvm_arch_init_vcpu(CPUState *cs)
 
     cpuid_i = 0;
 
+    //主要工作就是构造虚拟机vCPU的CPUID，这样虚拟机才能获取诸如架构，型号，厂商等信息
+    //然后调用ioctl将CPUID的信息给KVM，这样当虚拟机执行敏感指令CPUID的时候会VM-Exit，KVM就将QEMU构造的CPUID数据给虚拟机
     /* Paravirtualization CPUIDs */
     if (hyperv_enabled(cpu)) {
         c = &cpuid_data.entries[cpuid_i++];
@@ -770,6 +772,8 @@ int kvm_arch_init_vcpu(CPUState *cs)
         has_msr_hv_hypercall = true;
     }
 
+    //对于虚拟机的CPUID，QEMU会使用一些intel没有使用的CPUID来提供一些功能，譬如用0x40000000功能号导出一些KVM的信息
+    //虚拟机内核可以在启动的时候，用CPUID来判断其是不是工作在KVM上，进而做一些优化
     if (cpu->expose_kvm) {
         memcpy(signature, "KVMKVMKVM\0\0\0", 12);
         c = &cpuid_data.entries[cpuid_i++];
@@ -784,6 +788,7 @@ int kvm_arch_init_vcpu(CPUState *cs)
         c->eax = env->features[FEAT_KVM];
     }
 
+    //获取基础功能的最大功能号, 保存在limit中，然后一项一项获取
     cpu_x86_cpuid(env, 0, 0, &limit, &unused, &unused, &unused);
 
     for (i = 0; i <= limit; i++) {
@@ -967,7 +972,7 @@ int kvm_arch_init_vcpu(CPUState *cs)
     }
 
     cpuid_data.cpuid.padding = 0;
-    r = kvm_vcpu_ioctl(cs, KVM_SET_CPUID2, &cpuid_data);
+    r = kvm_vcpu_ioctl(cs, KVM_SET_CPUID2, &cpuid_data); //都设置好后， 将CPUID信息交给KVM
     if (r) {
         return r;
     }
@@ -2757,6 +2762,7 @@ int kvm_arch_get_registers(CPUState *cs)
     return ret;
 }
 
+//运行前准备，譬如：nmi smi中断的注入
 void kvm_arch_pre_run(CPUState *cpu, struct kvm_run *run)
 {
     X86CPU *x86_cpu = X86_CPU(cpu);
