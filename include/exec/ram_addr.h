@@ -22,11 +22,12 @@
 #ifndef CONFIG_USER_ONLY
 #include "hw/xen/xen.h"
 
+//表示虚拟机的一块内存条
 struct RAMBlock {
     struct rcu_head rcu;
-    struct MemoryRegion *mr;
-    uint8_t *host;
-    ram_addr_t offset;
+    struct MemoryRegion *mr; //所属memoryregion
+    uint8_t *host; //虚拟机物理内存在QEMU进程中对应的虚拟内存
+    ram_addr_t offset; //该内存条在虚拟机整个内存中的偏移
     ram_addr_t used_length;
     ram_addr_t max_length;
     void (*resized)(const char*, uint64_t length, void *host);
@@ -34,9 +35,9 @@ struct RAMBlock {
     /* Protected by iothread lock.  */
     char idstr[256];
     /* RCU-enabled, writes protected by the ramlist lock */
-    QLIST_ENTRY(RAMBlock) next;
-    int fd;
-    size_t page_size;
+    QLIST_ENTRY(RAMBlock) next; //所有的ram之间，通过next域连接，链表头是ram_list.blocks
+    int fd; //对应的fd，如果有文件作为后端，譬如大页文件系统
+    size_t page_size; //页面大小
 };
 
 static inline bool offset_in_ramblock(RAMBlock *b, ram_addr_t offset)

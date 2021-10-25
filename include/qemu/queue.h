@@ -339,7 +339,7 @@ struct {                                                                \
 
 
 /*
- * Tail queue definitions.
+ * Tail queue definitions. QEMU_TAIL_QUEUE
  */
 #define Q_TAILQ_HEAD(name, type, qual)                                  \
 struct name {                                                           \

@@ -97,6 +97,7 @@ static AddrRange addrrange_intersection(AddrRange r1, AddrRange r2)
 
 enum ListenerDirection { Forward, Reverse };
 
+//这个宏调用每个memory listener的回调函数
 #define MEMORY_LISTENER_CALL_GLOBAL(_callback, _direction, _args...)    \
     do {                                                                \
         MemoryListener *_listener;                                      \
@@ -209,9 +210,9 @@ typedef struct FlatView FlatView;
 
 /* Range of memory in the global map.  Addresses are absolute. */
 struct FlatRange {
-    MemoryRegion *mr;
-    hwaddr offset_in_region;
-    AddrRange addr;
+    MemoryRegion *mr; //对应的memory region
+    hwaddr offset_in_region; //该flag_range 在memory region中的偏移
+    AddrRange addr; //表示地址和大小
     uint8_t dirty_log_mask;
     bool romd_mode;
     bool readonly;
@@ -223,9 +224,9 @@ struct FlatRange {
 struct FlatView {
     struct rcu_head rcu;
     unsigned ref;
-    FlatRange *ranges;
-    unsigned nr;
-    unsigned nr_allocated;
+    FlatRange *ranges; //MemoryRegion展开后的平坦视图下，内存拓扑由FlagRange表示
+    unsigned nr; //表示FlagRange的数目
+    unsigned nr_allocated; //已经分配的FlatRange数目
 };
 
 typedef struct AddressSpaceOps AddressSpaceOps;
@@ -614,11 +615,13 @@ static AddressSpace *memory_region_to_address_space(MemoryRegion *mr)
 /* Render a memory region into the global view.  Ranges in @view obscure
  * ranges in @mr.
  */
-static void render_memory_region(FlatView *view,
-                                 MemoryRegion *mr,
-                                 Int128 base,
-                                 AddrRange clip,
-                                 bool readonly)
+//递归处理，将memory region及其子memory region展开，并把数据记录到一个FlatView中
+//将一个MemoryRegion转换为 **若干个FlatRange** , 然后插入到第一个参数的FlatView中
+static void render_memory_region(FlatView *view, //一个AddressSpace的FlatView
+                                 MemoryRegion *mr, //需要展开的memoryregion
+                                 Int128 base, //即将展开的mrmoryregion的开始位置
+                                 AddrRange clip, //一段虚拟机物理地址范围
+                                 bool readonly) //表示该memory region是否只读
 {
     MemoryRegion *subregion;
     unsigned i;
@@ -652,7 +655,7 @@ static void render_memory_region(FlatView *view,
 
     /* Render subregions in priority order. */
     QTAILQ_FOREACH(subregion, &mr->subregions, subregions_link) {
-        render_memory_region(view, subregion, base, clip, readonly);
+        render_memory_region(view, subregion, base, clip, readonly); //递归调用，每次去处理一个自己的子region, 将结果存储到view中
     }
 
     if (!mr->terminates) {
@@ -704,13 +707,13 @@ static FlatView *generate_memory_topology(MemoryRegion *mr)
     FlatView *view;
 
     view = g_new(FlatView, 1);
-    flatview_init(view);
+    flatview_init(view); //初始化一个空的FlatView
 
-    if (mr) {
+    if (mr) { //递归处理，将memory region及其子memory region展开，并把数据记录到一个FlagView中
         render_memory_region(view, mr, int128_zero(),
                              addrrange_make(int128_zero(), int128_2_64()), false);
     }
-    flatview_simplify(view);
+    flatview_simplify(view); //将FlatView中能够合并的FlatRange进行合并
 
     return view;
 }
@@ -809,6 +812,12 @@ static void address_space_update_ioeventfds(AddressSpace *as)
     flatview_unref(view);
 }
 
+//将AddressSpace描述的内存拓扑信息，同步给KVM
+//会便利old_view 和 new_view的FlatRange, 有4种情况：
+//1. FlatRange在old view中，而不是新的，那么删除老的FlatView
+//2. FlatRange在old view中，也在new view中，但是其属性变化了，那么删除old view
+//3. 如果同时都在，adding为 true，同时只是dirt_log_mask,那么相应的取消和开始log
+//4. 如果只在new_view中，并且是添加的，则调用相应的add函数
 static void address_space_update_topology_pass(AddressSpace *as,
                                                const FlatView *old_view,
                                                const FlatView *new_view,
@@ -868,7 +877,7 @@ static void address_space_update_topology_pass(AddressSpace *as,
             /* In new */
 
             if (adding) {
-                MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, region_add);
+                MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, region_add); //%kvm_region_add
             }
 
             ++inew;
@@ -919,14 +928,14 @@ void memory_region_transaction_commit(void)
     assert(memory_region_transaction_depth);
     --memory_region_transaction_depth;
     if (!memory_region_transaction_depth) {
-        if (memory_region_update_pending) {
-            MEMORY_LISTENER_CALL_GLOBAL(begin, Forward);
+        if (memory_region_update_pending) { //发生内存更新的时候，这个值是true
+            MEMORY_LISTENER_CALL_GLOBAL(begin, Forward); //这个宏调用每个memory listener的begin操作，各个listener可以做一些初始化工作
 
             QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
-                address_space_update_topology(as);
+                address_space_update_topology(as); //更新addressspace的内存视图, 这个过程可能会调用 add del等回调函数
             }
 
-            MEMORY_LISTENER_CALL_GLOBAL(commit, Forward);
+            MEMORY_LISTENER_CALL_GLOBAL(commit, Forward); //最后调用memory listeners的commit回调函数
         } else if (ioeventfd_update_pending) {
             QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
                 address_space_update_ioeventfds(as);
@@ -1359,10 +1368,10 @@ void memory_region_init_ram(MemoryRegion *mr,
                             Error **errp)
 {
     memory_region_init(mr, owner, name, size);
-    mr->ram = true;
+    mr->ram = true; //这里都是true
     mr->terminates = true;
     mr->destructor = memory_region_destructor_ram;
-    mr->ram_block = qemu_ram_alloc(size, mr, errp);
+    mr->ram_block = qemu_ram_alloc(size, mr, errp); //实际工作
     mr->dirty_log_mask = tcg_enabled() ? (1 << DIRTY_MEMORY_CODE) : 0;
 }
 
@@ -2057,6 +2066,7 @@ void memory_region_add_subregion(MemoryRegion *mr,
     memory_region_add_subregion_common(mr, offset, subregion);
 }
 
+//将一个MemoryRegion加入到一个container中，允许重叠，对于重叠部分，谁优先级高，谁就被虚拟机看到
 void memory_region_add_subregion_overlap(MemoryRegion *mr,
                                          hwaddr offset,
                                          MemoryRegion *subregion,
@@ -2326,6 +2336,7 @@ static void listener_add_address_space(MemoryListener *listener,
     flatview_unref(view);
 }
 
+//将listener注册到as地址空间中，as地址空间拓扑结构发生变化的时候会通知
 void memory_listener_register(MemoryListener *listener, AddressSpace *as)
 {
     MemoryListener *other = NULL;

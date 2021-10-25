@@ -1451,7 +1451,7 @@ void cpu_x86_update_dr7(CPUX86State *env, uint32_t new_dr7);
 /* hw/pc.c */
 uint64_t cpu_get_tsc(CPUX86State *env);
 
-#define TARGET_PAGE_BITS 12
+#define TARGET_PAGE_BITS 12 //4K
 
 #ifdef TARGET_X86_64
 #define TARGET_PHYS_ADDR_SPACE_BITS 52

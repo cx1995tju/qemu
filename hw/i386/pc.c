@@ -824,6 +824,7 @@ struct setup_data {
     uint8_t data[0];
 } __attribute__((packed));
 
+//如果使用了-kernel参数启动的qemu(譬如使用qemu调试内核的时候), 就会使用load_linux，读取-kernel指定的文件，将其添加到fw_cfg设备中
 static void load_linux(PCMachineState *pcms,
                        FWCfgState *fw_cfg)
 {
@@ -1360,6 +1361,7 @@ void xen_load_linux(PCMachineState *pcms)
     pcms->fw_cfg = fw_cfg;
 }
 
+//主要用于分配虚拟机的物理内存以及初始化相应的memoryRegion和rom，并将相应数据添加到fw_cfg设备中
 void pc_memory_init(PCMachineState *pcms,
                     MemoryRegion *system_memory,
                     MemoryRegion *rom_memory,
@@ -1382,16 +1384,16 @@ void pc_memory_init(PCMachineState *pcms,
      * with older qemus that used qemu_ram_alloc().
      */
     ram = g_malloc(sizeof(*ram));
-    memory_region_allocate_system_memory(ram, NULL, "pc.ram",
+    memory_region_allocate_system_memory(ram, NULL, "pc.ram", //分配虚拟机实际物理内存，名字为pc.ram
                                          machine->ram_size);
     *ram_memory = ram;
     ram_below_4g = g_malloc(sizeof(*ram_below_4g));
-    memory_region_init_alias(ram_below_4g, NULL, "ram-below-4g", ram,
+    memory_region_init_alias(ram_below_4g, NULL, "ram-below-4g", ram, //创建below 4g的内存的memory region，并作为subregion，加入到system_memory中管理
                              0, pcms->below_4g_mem_size);
     memory_region_add_subregion(system_memory, 0, ram_below_4g);
-    e820_add_entry(0, pcms->below_4g_mem_size, E820_RAM);
+    e820_add_entry(0, pcms->below_4g_mem_size, E820_RAM); //小于4G的内存还要加入e820表中，供bios使用
     if (pcms->above_4g_mem_size > 0) {
-        ram_above_4g = g_malloc(sizeof(*ram_above_4g));
+        ram_above_4g = g_malloc(sizeof(*ram_above_4g)); //建立above 4g的region
         memory_region_init_alias(ram_above_4g, NULL, "ram-above-4g", ram,
                                  pcms->below_4g_mem_size,
                                  pcms->above_4g_mem_size);
@@ -1451,10 +1453,10 @@ void pc_memory_init(PCMachineState *pcms,
     }
 
     /* Initialize PC system firmware */
-    pc_system_firmware_init(rom_memory, !pcmc->pci_enabled);
+    pc_system_firmware_init(rom_memory, !pcmc->pci_enabled); //固件初始化,rom_memory 其实就是pci_memory
 
     option_rom_mr = g_malloc(sizeof(*option_rom_mr));
-    memory_region_init_ram(option_rom_mr, NULL, "pc.rom", PC_ROM_SIZE,
+    memory_region_init_ram(option_rom_mr, NULL, "pc.rom", PC_ROM_SIZE, //初始化rom，命名为pc.rom
                            &error_fatal);
     vmstate_register_ram_global(option_rom_mr);
     memory_region_add_subregion_overlap(rom_memory,
@@ -1462,9 +1464,9 @@ void pc_memory_init(PCMachineState *pcms,
                                         option_rom_mr,
                                         1);
 
-    fw_cfg = bochs_bios_init(&address_space_memory, pcms);
+    fw_cfg = bochs_bios_init(&address_space_memory, pcms); //创建了一个fw_cfg设备
 
-    rom_set_fw(fw_cfg);
+    rom_set_fw(fw_cfg); //将fw_cfg设备复制到全局变量fw_cfg中
 
     if (pcmc->has_reserved_memory && pcms->hotplug_memory.base) {
         uint64_t *val = g_malloc(sizeof(*val));
@@ -1478,17 +1480,17 @@ void pc_memory_init(PCMachineState *pcms,
         fw_cfg_add_file(fw_cfg, "etc/reserved-memory-end", val, sizeof(*val));
     }
 
-    if (linux_boot) {
+    if (linux_boot) { //如果使用了-kernel参数启动的qemu(譬如使用qemu调试内核的时候), 就会使用load_linux，读取-kernel指定的文件，将其添加到fw_cfg设备中
         load_linux(pcms, fw_cfg);
     }
 
     for (i = 0; i < nb_option_roms; i++) {
-        rom_add_option(option_rom[i].name, option_rom[i].bootindex);
+        rom_add_option(option_rom[i].name, option_rom[i].bootindex); //添加其他rom
     }
     pcms->fw_cfg = fw_cfg;
 
     /* Init default IOAPIC address space */
-    pcms->ioapic_as = &address_space_memory;
+    pcms->ioapic_as = &address_space_memory; //设置pcms->ioapic_as 为全局的address_space_memory
 }
 
 qemu_irq pc_allocate_cpu_irq(void)

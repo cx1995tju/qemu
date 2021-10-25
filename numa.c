@@ -404,6 +404,7 @@ void numa_post_machine_init(void)
     }
 }
 
+//owner是上一级memroyregion
 static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
                                            const char *name,
                                            uint64_t ram_size)
@@ -441,6 +442,7 @@ void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
     uint64_t addr = 0;
     int i;
 
+    //nonuma
     if (nb_numa_nodes == 0 || !have_memdevs) {
         allocate_system_memory_nonnuma(mr, owner, name, ram_size);
         return;

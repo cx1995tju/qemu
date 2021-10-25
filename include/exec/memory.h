@@ -197,27 +197,27 @@ struct MemoryRegion {
     bool flush_coalesced_mmio;
     bool global_locking;
     uint8_t dirty_log_mask;
-    RAMBlock *ram_block;
+    RAMBlock *ram_block; //表示实际分配的物理内存
     Object *owner;
     const MemoryRegionIOMMUOps *iommu_ops;
 
-    const MemoryRegionOps *ops;
+    const MemoryRegionOps *ops; //一组回调函数，在对MemoryRegion操作的时候会被调用，譬如：MMIO的读写请求
     void *opaque;
-    MemoryRegion *container;
+    MemoryRegion *container; //表示其上一级的MemoryRegion
     Int128 size;
-    hwaddr addr;
+    hwaddr addr; //该MemoryRegion所在的 **虚拟机上的物理地址**
     void (*destructor)(MemoryRegion *mr);
     uint64_t align;
-    bool terminates;
+    bool terminates; //指示是否是叶子节点
     bool ram_device;
     bool enabled;
     bool warning_printed; /* For reservations */
     uint8_t vga_logging_count;
     MemoryRegion *alias;
     hwaddr alias_offset;
-    int32_t priority;
-    QTAILQ_HEAD(subregions, MemoryRegion) subregions;
-    QTAILQ_ENTRY(MemoryRegion) subregions_link;
+    int32_t priority; //优先级，值大更优先，通常情况下，同一个container的MemoryRegion不会重叠，索引地址的时候只会落入到一个MemoryRegion，有时候重叠的话有好处，那么这时候就使用priority来判断选择哪个MemoryRegion。只会比较同一个container下的MemoryRegion的priority
+    QTAILQ_HEAD(subregions, MemoryRegion) subregions; //连接所有的子MemoryRegion
+    QTAILQ_ENTRY(MemoryRegion) subregions_link;  //连接同一个父节点下的兄弟节点
     QTAILQ_HEAD(coalesced_ranges, CoalescedMemoryRange) coalesced;
     const char *name;
     unsigned ioeventfd_nb;
@@ -232,13 +232,14 @@ struct MemoryRegion {
  * Allows a component to adjust to changes in the guest-visible memory map.
  * Use with memory_listener_register() and memory_listener_unregister().
  */
+//注册函数 memory_listener_register
 struct MemoryListener {
     void (*begin)(MemoryListener *listener);
-    void (*commit)(MemoryListener *listener);
-    void (*region_add)(MemoryListener *listener, MemoryRegionSection *section);
+    void (*commit)(MemoryListener *listener); //执行内存变更时执行的函数
+    void (*region_add)(MemoryListener *listener, MemoryRegionSection *section); //添加region的时候调用
     void (*region_del)(MemoryListener *listener, MemoryRegionSection *section);
     void (*region_nop)(MemoryListener *listener, MemoryRegionSection *section);
-    void (*log_start)(MemoryListener *listener, MemoryRegionSection *section,
+    void (*log_start)(MemoryListener *listener, MemoryRegionSection *section, //log_XXX和脏页机制的开启同步有关
                       int old, int new);
     void (*log_stop)(MemoryListener *listener, MemoryRegionSection *section,
                      int old, int new);
@@ -254,37 +255,38 @@ struct MemoryListener {
     void (*coalesced_mmio_del)(MemoryListener *listener, MemoryRegionSection *section,
                                hwaddr addr, hwaddr len);
     /* Lower = earlier (during add), later (during del) */
-    unsigned priority;
+    unsigned priority; //表示优先级，优先级低的先被调用，删除的时候后被删除
     AddressSpace *address_space;
-    QTAILQ_ENTRY(MemoryListener) link;
-    QTAILQ_ENTRY(MemoryListener) link_as;
+    QTAILQ_ENTRY(MemoryListener) link; //链接到全局变量memory_listeners
+    QTAILQ_ENTRY(MemoryListener) link_as; //同一个地址空间的memory listener通过这个也链接到一起
 };
 
 /**
  * AddressSpace: describes a mapping of addresses to #MemoryRegion objects
  */
+//所有的AddressSpace通过address_spaces_link 节点连接起来
 struct AddressSpace {
     /* All fields are private. */
     struct rcu_head rcu;
     char *name;
-    MemoryRegion *root;
+    MemoryRegion *root; //该addressspace 对应的根MemoryRegion
     int ref_count;
     bool malloced;
 
     /* Accessed via RCU.  */
-    struct FlatView *current_map;
+    struct FlatView *current_map; //表示该地址空间对应的平坦模式下的视图
 
     int ioeventfd_nb;
     struct MemoryRegionIoeventfd *ioeventfds;
     struct AddressSpaceDispatch *dispatch;
     struct AddressSpaceDispatch *next_dispatch;
     MemoryListener dispatch_listener;
-    QTAILQ_HEAD(memory_listeners_as, MemoryListener) listeners;
+    QTAILQ_HEAD(memory_listeners_as, MemoryListener) listeners; //QEMU的其他子系统可以注册内存事件的变更事件的回调函数，就挂载在这里, 所有同一个地址的都链接在这里
     QTAILQ_ENTRY(AddressSpace) address_spaces_link;
 };
 
 /**
- * MemoryRegionSection: describes a fragment of a #MemoryRegion
+ * MemoryRegionSection: describes a fragment of a #MemoryRegion    ****
  *
  * @mr: the region, or %NULL if empty
  * @address_space: the address space the region is mapped in

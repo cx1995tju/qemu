@@ -237,6 +237,9 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot)
     KVMState *s = kvm_state;
     struct kvm_userspace_memory_region mem;
 
+    //将QEMU表示的内存槽的KVMSlot结构转换为KVM表示内存操作的kvm_userspace_memory_region结构，并注册到KVM内核模块中
+    //向KVM注册后，虚拟机对于物理地址的访问，本质就是对QEMU虚拟地址的访问
+    //这里实现的本质，应该是KVM将QEMU提供的内存，通过EPT表的设置提供给了虚拟机
     mem.slot = slot->slot | (kml->as_id << 16);
     mem.guest_phys_addr = slot->start_addr;
     mem.userspace_addr = (unsigned long)slot->ram;
@@ -959,10 +962,10 @@ void kvm_memory_listener_register(KVMState *s, KVMMemoryListener *kml,
     kml->as_id = as_id;
 
     for (i = 0; i < s->nr_slots; i++) {
-        kml->slots[i].slot = i;
+        kml->slots[i].slot = i; //该结构表示KVM内存slot，即对于KVM来说，虚拟机有多少段内存
     }
 
-    kml->listener.region_add = kvm_region_add;
+    kml->listener.region_add = kvm_region_add; //初始化各种回调函数
     kml->listener.region_del = kvm_region_del;
     kml->listener.log_start = kvm_log_start;
     kml->listener.log_stop = kvm_log_stop;

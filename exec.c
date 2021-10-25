@@ -144,7 +144,8 @@ struct PhysPageEntry {
     /* How many bits skip to next level (in units of L2_SIZE). 0 for a leaf. */
     uint32_t skip : 6;
      /* index into phys_sections (!skip) or phys_map_nodes (skip) */
-    uint32_t ptr : 26;
+    uint32_t ptr : 26; //如果是非叶子节点，那么用于索引Node中的项; 叶子节点的ptr指向用来缩影sections数组，最终找到MR Section
+			//同页表类似，这个ptr一般是地址中的某几位
 };
 
 #define PHYS_MAP_NODE_NIL (((uint32_t)~0) >> 6)
@@ -162,23 +163,23 @@ typedef PhysPageEntry Node[P_L2_SIZE];
 typedef struct PhysPageMap {
     struct rcu_head rcu;
 
-    unsigned sections_nb;
-    unsigned sections_nb_alloc;
-    unsigned nodes_nb;
-    unsigned nodes_nb_alloc;
-    Node *nodes;
-    MemoryRegionSection *sections;
+    unsigned sections_nb; //sections指向的数组中的元素个数
+    unsigned sections_nb_alloc; //sections总共分配的元素个数
+    unsigned nodes_nb; //node的个数, 这里是所有的node，而不是某一级
+    unsigned nodes_nb_alloc; //node总共分配的个数
+    Node *nodes; //表示中间节点, 就是"页表项", Node实际就是一个512 entries的PhysPageEntry数组, 每个entry表示一个页页表项
+    MemoryRegionSection *sections; //对应的AddressSpace的所有的MemoryRegionSection, 就是“物理页面”
 } PhysPageMap;
 
 struct AddressSpaceDispatch {
     struct rcu_head rcu;
 
-    MemoryRegionSection *mru_section;
+    MemoryRegionSection *mru_section; //缓存，保存最近一次找到的mr section
     /* This is a multi-level map on the physical address space.
      * The bottom level has pointers to MemoryRegionSections.
      */
-    PhysPageEntry phys_map;
-    PhysPageMap map;
+    PhysPageEntry phys_map; //指向第一级"页表", 就是"CR3寄存器"
+    PhysPageMap map; //类似于页表的多级map，进行内存的分派, 这个就是"页表", 这里存储了所有的中间节点的node，所有的叶子节点, 而不是某一级，至于各个级之间的层次关系，则依赖于phys_map去构建了。 这个map就是一个数据库“存储所有信息”, 这个phys_map才是索引起点，即CR3寄存器
     AddressSpace *as;
 };
 
@@ -269,13 +270,15 @@ static void phys_page_set_level(PhysPageMap *map, PhysPageEntry *lp,
             lp->ptr = leaf;
             *index += step;
             *nb -= step;
-        } else {
+        } else { //递归调用，构建起多级页表
             phys_page_set_level(map, lp, index, nb, leaf, level - 1);
         }
         ++lp;
     }
 }
 
+//向d->map->sections中添加, 返回其中的索引
+//nb是该MR Section中的页数
 static void phys_page_set(AddressSpaceDispatch *d,
                           hwaddr index, hwaddr nb,
                           uint16_t leaf)
@@ -1125,12 +1128,13 @@ static void phys_sections_free(PhysPageMap *map)
     g_free(map->nodes);
 }
 
+//用于注册不到一页的MemoryRegion， 在IO地址空间很常见
 static void register_subpage(AddressSpaceDispatch *d, MemoryRegionSection *section)
 {
     subpage_t *subpage;
     hwaddr base = section->offset_within_address_space
         & TARGET_PAGE_MASK;
-    MemoryRegionSection *existing = phys_page_find(d->phys_map, base,
+    MemoryRegionSection *existing = phys_page_find(d->phys_map, base, //使用base寻找或者构造一个MR Section
                                                    d->map.nodes, d->map.sections);
     MemoryRegionSection subsection = {
         .offset_within_address_space = base,
@@ -1140,8 +1144,9 @@ static void register_subpage(AddressSpaceDispatch *d, MemoryRegionSection *secti
 
     assert(existing->mr->subpage || existing->mr == &io_mem_unassigned);
 
+    //如果是第一次创建的话，进这个if分支
     if (!(existing->mr->subpage)) {
-        subpage = subpage_init(d->as, base);
+        subpage = subpage_init(d->as, base); //初始化并创建一个subpage_t结构
         subsection.address_space = d->as;
         subsection.mr = &subpage->iomem;
         phys_page_set(d, base >> TARGET_PAGE_BITS, 1,
@@ -1156,18 +1161,22 @@ static void register_subpage(AddressSpaceDispatch *d, MemoryRegionSection *secti
 }
 
 
+//将Section添加到AddressSpace Dispatch中
 static void register_multipage(AddressSpaceDispatch *d,
                                MemoryRegionSection *section)
 {
-    hwaddr start_addr = section->offset_within_address_space;
+    hwaddr start_addr = section->offset_within_address_space; //在对应的AddressSpace中的起始地址
     uint16_t section_index = phys_section_add(&d->map, section);
     uint64_t num_pages = int128_get64(int128_rshift(section->size,
                                                     TARGET_PAGE_BITS));
 
     assert(num_pages);
+    //向d->map->sections中添加, 返回其中的索引
+    //起始地址的低4K作为页内索引
     phys_page_set(d, start_addr >> TARGET_PAGE_BITS, num_pages, section_index);
 }
 
+//给定一个MR section，会创建地址到这个SEction的映射，加入到对应的AddressSpaceDispatch中
 static void mem_add(MemoryListener *listener, MemoryRegionSection *section)
 {
     AddressSpace *as = container_of(listener, AddressSpace, dispatch_listener);
@@ -1194,7 +1203,7 @@ static void mem_add(MemoryListener *listener, MemoryRegionSection *section)
         } else if (remain.offset_within_address_space & ~TARGET_PAGE_MASK) {
             now.size = page_size;
             register_subpage(d, &now);
-        } else {
+        } else { //如果是页对齐，并且长度是页的整数倍，使用register_multipage完成添加
             now.size = int128_and(now.size, int128_neg(page_size));
             register_multipage(d, &now);
         }
@@ -1370,6 +1379,7 @@ error:
 #endif
 
 /* Called with the ramlist lock held.  */
+//遍历整个RAM链，找到一个能插入该size大小的ram的位置
 static ram_addr_t find_ram_offset(ram_addr_t size)
 {
     RAMBlock *block, *next_block;
@@ -1540,6 +1550,7 @@ int qemu_ram_resize(RAMBlock *block, ram_addr_t newsize, Error **errp)
 }
 
 /* Called with ram_list.mutex held */
+//更新用于脏页标记的bitmap的大小，脏页涉及到热迁移。
 static void dirty_memory_extend(ram_addr_t old_ram_size,
                                 ram_addr_t new_ram_size)
 {
@@ -1580,6 +1591,7 @@ static void dirty_memory_extend(ram_addr_t old_ram_size,
     }
 }
 
+//添加内存条到系统内存
 static void ram_block_add(RAMBlock *new_block, Error **errp)
 {
     RAMBlock *block;
@@ -1587,10 +1599,10 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
     ram_addr_t old_ram_size, new_ram_size;
     Error *err = NULL;
 
-    old_ram_size = last_ram_offset() >> TARGET_PAGE_BITS;
+    old_ram_size = last_ram_offset() >> TARGET_PAGE_BITS; //添加前，系统的RAM大小
 
     qemu_mutex_lock_ramlist();
-    new_block->offset = find_ram_offset(new_block->max_length);
+    new_block->offset = find_ram_offset(new_block->max_length); //找到新的内存条在整个系统内存的位置
 
     if (!new_block->host) {
         if (xen_enabled()) {
@@ -1602,7 +1614,7 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
                 return;
             }
         } else {
-            new_block->host = phys_mem_alloc(new_block->max_length,
+            new_block->host = phys_mem_alloc(new_block->max_length, //分配qemu虚拟内存作为虚拟机物理内存
                                              &new_block->mr->align);
             if (!new_block->host) {
                 error_setg_errno(errp, errno,
@@ -1619,7 +1631,7 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
               (new_block->offset + new_block->max_length) >> TARGET_PAGE_BITS);
     if (new_ram_size > old_ram_size) {
         migration_bitmap_extend(old_ram_size, new_ram_size);
-        dirty_memory_extend(old_ram_size, new_ram_size);
+        dirty_memory_extend(old_ram_size, new_ram_size); //更新用于脏页标记的bitmap的大小，脏页涉及到热迁移。
     }
     /* Keep the list sorted from biggest to smallest block.  Unlike QTAILQ,
      * QLIST (which has an RCU-friendly variant) does not have insertion at
@@ -1653,7 +1665,7 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
         qemu_ram_setup_dump(new_block->host, new_block->max_length);
         qemu_madvise(new_block->host, new_block->max_length, QEMU_MADV_HUGEPAGE);
         /* MADV_DONTFORK is also needed by KVM in absence of synchronous MMU */
-        qemu_madvise(new_block->host, new_block->max_length, QEMU_MADV_DONTFORK);
+        qemu_madvise(new_block->host, new_block->max_length, QEMU_MADV_DONTFORK); //给os一些建议，譬如有大页就使用大页
     }
 }
 
@@ -1704,6 +1716,7 @@ RAMBlock *qemu_ram_alloc_from_file(ram_addr_t size, MemoryRegion *mr,
 }
 #endif
 
+//分配RAMBlock结构，并且分配qemu的虚拟内存作为虚拟机的物理内存
 static
 RAMBlock *qemu_ram_alloc_internal(ram_addr_t size, ram_addr_t max_size,
                                   void (*resized)(const char*,
@@ -2327,6 +2340,7 @@ MemoryRegion *iotlb_to_region(CPUState *cpu, hwaddr index, MemTxAttrs attrs)
     return sections[index & ~TARGET_PAGE_MASK].mr;
 }
 
+//创建若干个包含所有地址空间的MemoryRegion
 static void io_mem_init(void)
 {
     memory_region_init_io(&io_mem_rom, NULL, &unassigned_mem_ops, NULL, NULL, UINT64_MAX);
@@ -2364,6 +2378,7 @@ static void address_space_dispatch_free(AddressSpaceDispatch *d)
     g_free(d);
 }
 
+//做"页表"简化的, refer to %mem_add
 static void mem_commit(MemoryListener *listener)
 {
     AddressSpace *as = container_of(listener, AddressSpace, dispatch_listener);
@@ -2424,6 +2439,10 @@ void address_space_destroy_dispatch(AddressSpace *as)
     }
 }
 
+//极其重要的函数
+//创建两个address_space, 一个表示真个系统内存地址空间，一个表示IO地址空间
+//前者根memoryregion是system_memory, 后者根memroyregion是system_io；
+//这两者都是全局变量
 static void memory_map_init(void)
 {
     system_memory = g_malloc(sizeof(*system_memory));
