@@ -67,6 +67,7 @@ struct TypeImpl
     ObjectClass *class; //指向类的一些基本信息, 在类初始化的时候，会去赋值的，如果没有赋值说明类没有初始化
 	//这些基本信息，也是按照父类的继承关系组织的，参考linux 的sock结构的层次关系。
 	//譬如： PCIDeviceClass
+	//可以认为是保存了一些类的metadata，理解为C++中类的静态成员
 
     int num_interfaces;
     InterfaceImpl interfaces[MAX_INTERFACES]; //接口类，就是c++中仅仅包含纯虚函数的抽象类, 或者就是java中的接口
@@ -910,6 +911,8 @@ void object_unref(Object *obj)
     }
 }
 
+//为对象obj添加一个名为name，类型是type， 对应的set get release函数的属性
+//本质就是在对象的properties hash 表上插入了一个属性结构ObjectProperty
 ObjectProperty *
 object_property_add(Object *obj, const char *name, const char *type,
                     ObjectPropertyAccessor *get,
@@ -920,6 +923,7 @@ object_property_add(Object *obj, const char *name, const char *type,
     ObjectProperty *prop;
     size_t name_len = strlen(name);
 
+    //name len太长要处理下
     if (name_len >= 3 && !memcmp(name + name_len - 3, "[*]", 4)) {
         int i;
         ObjectProperty *ret;
@@ -1533,10 +1537,17 @@ static void object_release_link_property(Object *obj, const char *name,
 //child指向的指针，一般是obj的一个成员
 //表示obj的这个成员引用(link)了某个对象, 具体link的对象在object_set_link_property中设置, 可以动态切换的
 //不严谨的说：添加的link属性表明：obj的*child成员指针会指向一个对象，该对象被obj引用。对象的设置是动态切换的
+//关于link属性
+// 1. 首先调用该函数为一个object添加一个link属性
+// 2. object_set_link_property设置该link属性
+//
+// 给对象obj添加一个类型是link<type>, 名为name的link属性
+//  get 函数: object_get_link_property
+//  set 函数：objecty_set_link_property
 void object_property_add_link(Object *obj, const char *name,
-                              const char *type, Object **child, //注意，这里是一个child的二级指针
+                              const char *type, Object **child, //注意，这里是一个child的二级指针, 这个child一般都是obj的一个指针成员的指针
                               void (*check)(Object *, const char *,
-                                            Object *, Error **),
+                                            Object *, Error **), //判断是否允许set link属性
                               ObjectPropertyLinkFlags flags,
                               Error **errp)
 {
@@ -1555,7 +1566,7 @@ void object_property_add_link(Object *obj, const char *name,
                              object_get_link_property,
                              check ? object_set_link_property : NULL,
                              object_release_link_property,
-                             prop,
+                             prop, //link属性非常有意思，将prop作为opaque传入进去了
                              &local_err);
     if (local_err) {
         error_propagate(errp, local_err);
@@ -1893,7 +1904,7 @@ void object_property_add_bool(Object *obj, const char *name,
                         get ? property_get_bool : NULL,
                         set ? property_set_bool : NULL,
                         property_release_bool,
-                        prop, &local_err);
+                        prop, &local_err); //prop作为opaque传入了
     if (local_err) {
         error_propagate(errp, local_err);
         g_free(prop);

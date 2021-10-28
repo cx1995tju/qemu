@@ -5,7 +5,7 @@
 
 #define TYPE_IRQ "irq"
 
-typedef struct IRQState *qemu_irq;
+typedef struct IRQState *qemu_irq; //表示一个中断引脚
 
 typedef void (*qemu_irq_handler)(void *opaque, int n, int level);
 

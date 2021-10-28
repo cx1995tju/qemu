@@ -53,7 +53,7 @@ struct PCMachineState {
     ISADevice *rtc;
     PCIBus *bus;
     FWCfgState *fw_cfg;
-    qemu_irq *gsi;
+    qemu_irq *gsi; //这个引脚数组是整个虚拟机中断路由的起点, 这是一个数组
 
     /* Configuration options: */
     uint64_t max_ram_below_4g;
@@ -194,9 +194,10 @@ void ioapic_dump_state(Monitor *mon, const QDict *qdict);
 
 #define GSI_NUM_PINS IOAPIC_NUM_PINS
 
+//表示虚拟机的中断状态
 typedef struct GSIState {
-    qemu_irq i8259_irq[ISA_NUM_IRQS];
-    qemu_irq ioapic_irq[IOAPIC_NUM_PINS];
+    qemu_irq i8259_irq[ISA_NUM_IRQS]; //XT-PIC的16个引脚
+    qemu_irq ioapic_irq[IOAPIC_NUM_PINS]; //IOAPIC的24个引脚
 } GSIState;
 
 void gsi_handler(void *opaque, int n, int level);

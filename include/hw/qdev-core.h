@@ -191,22 +191,22 @@ struct BusClass {
     ObjectClass parent_class;
 
     /* FIXME first arg should be BusState */
-    void (*print_dev)(Monitor *mon, DeviceState *dev, int indent);
+    void (*print_dev)(Monitor *mon, DeviceState *dev, int indent); //打印总线上的一个设备
     char *(*get_dev_path)(DeviceState *dev);
     /*
      * This callback is used to create Open Firmware device path in accordance
      * with OF spec http://forthworks.com/standards/of1275.pdf. Individual bus
      * bindings can be found at http://playground.sun.com/1275/bindings/.
      */
-    char *(*get_fw_dev_path)(DeviceState *dev);
+    char *(*get_fw_dev_path)(DeviceState *dev); //得到设备路径，以及在firmware的路径
     void (*reset)(BusState *bus);
-    BusRealize realize;
-    BusUnrealize unrealize;
+    BusRealize realize; //bus进行realize的回调函数
+    BusUnrealize unrealize; //销毁时的回调函数
 
     /* maximum devices allowed on the bus, 0: no limit. */
-    int max_dev;
+    int max_dev; //该bus上允许的最大设备
     /* number of automatically allocated bus ids (e.g. ide.0) */
-    int automatic_ids;
+    int automatic_ids; //自动生成bus id的序号
 };
 
 typedef struct BusChild {
@@ -223,13 +223,13 @@ typedef struct BusChild {
  */
 struct BusState {
     Object obj;
-    DeviceState *parent;
+    DeviceState *parent; //总线所在的设备，总线必须依赖于一个设备，譬如，pci总线是PCI桥产生的，USB总线是USB控制器产生的，SCSI总线是SCSI控制器产生的
     char *name;
-    HotplugHandler *hotplug_handler;
-    int max_index;
+    HotplugHandler *hotplug_handler; //用于处理热插拔的handler
+    int max_index; //插在该总线上的设备个数
     bool realized;
-    QTAILQ_HEAD(ChildrenHead, BusChild) children;
-    QLIST_ENTRY(BusState) sibling;
+    QTAILQ_HEAD(ChildrenHead, BusChild) children; //连接在该总线上的所有设备
+    QLIST_ENTRY(BusState) sibling; //连接在一条总线上的设备
 };
 
 struct Property {

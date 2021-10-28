@@ -376,7 +376,7 @@ struct ObjectClass
     const char *object_cast_cache[OBJECT_CLASS_CAST_CACHE];
     const char *class_cast_cache[OBJECT_CLASS_CAST_CACHE];
 
-    ObjectUnparent *unparent;
+    ObjectUnparent *unparent; //子类对象解除父类对象引用的时候调用, 参考child属性object_finalize_child_property
 
     GHashTable *properties;
 };

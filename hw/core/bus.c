@@ -195,7 +195,7 @@ static void qbus_initfn(Object *obj)
     QTAILQ_INIT(&bus->children);
     object_property_add_link(obj, QDEV_HOTPLUG_HANDLER_PROPERTY,
                              TYPE_HOTPLUG_HANDLER,
-                             (Object **)&bus->hotplug_handler,
+                             (Object **)&bus->hotplug_handler, //通过这个二级指针能够设置bus的hotplut_handler的指向, 通过设置其指向，就完成了一个对象与对象之间link关系的表达
                              object_property_allow_set_link,
                              OBJ_PROP_LINK_UNREF_ON_RELEASE,
                              NULL);
@@ -213,7 +213,7 @@ static void bus_class_init(ObjectClass *class, void *data)
     BusClass *bc = BUS_CLASS(class);
 
     class->unparent = bus_unparent;
-    bc->get_fw_dev_path = default_bus_get_fw_dev_path;
+    bc->get_fw_dev_path = default_bus_get_fw_dev_path; //默认函数，如果子类没有重写，就使用这个
 }
 
 static void qbus_finalize(Object *obj)
@@ -229,9 +229,9 @@ static const TypeInfo bus_info = {
     .instance_size = sizeof(BusState),
     .abstract = true,
     .class_size = sizeof(BusClass),
-    .instance_init = qbus_initfn,
+    .instance_init = qbus_initfn, //创建实例的时候调用
     .instance_finalize = qbus_finalize,
-    .class_init = bus_class_init,
+    .class_init = bus_class_init, //类型初始化的时候调用，参考type_initialize
 };
 
 static void bus_register_types(void)

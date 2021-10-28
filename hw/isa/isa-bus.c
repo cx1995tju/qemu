@@ -80,7 +80,7 @@ void isa_bus_irqs(ISABus *bus, qemu_irq *irqs)
  * This function is only for special cases such as the 'ferr', and
  * temporary use for normal devices until they are converted to qdev.
  */
-qemu_irq isa_get_irq(ISADevice *dev, int isairq)
+qemu_irq isa_get_irq(ISADevice *dev, int isairq) //isairq即gsi号
 {
     assert(!dev || ISA_BUS(qdev_get_parent_bus(DEVICE(dev))) == isabus);
     if (isairq < 0 || isairq > 15) {
@@ -89,6 +89,10 @@ qemu_irq isa_get_irq(ISADevice *dev, int isairq)
     return isabus->irqs[isairq];
 }
 
+//isa设备申请irq资源
+//dev isa设备
+//p 返回值,  **即申请到的中断资源**, 后面用这个做参数来触发中断 %qemu_set_irq
+//isairq 申请的中断引脚号
 void isa_init_irq(ISADevice *dev, qemu_irq *p, int isairq)
 {
     assert(dev->nirqs < ARRAY_SIZE(dev->isairq));

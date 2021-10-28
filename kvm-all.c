@@ -997,9 +997,9 @@ int kvm_set_irq(KVMState *s, int irq, int level)
 
     assert(kvm_async_interrupts_enabled());
 
-    event.level = level;
-    event.irq = irq;
-    ret = kvm_vm_ioctl(s, s->irq_set_ioctl, &event);
+    event.level = level; //电平
+    event.irq = irq; //中断号
+    ret = kvm_vm_ioctl(s, s->irq_set_ioctl, &event); //refer to %kvm_init, 会检查KVM是否具有KVM_CAP_IRQ_INJECT_STATUS扩展，有的话，会设置s->irq_set_ioctl 为 KVM_IRQ_LINE_STATUS
     if (ret < 0) {
         perror("kvm_set_irq");
         abort();
@@ -1721,7 +1721,7 @@ static int kvm_init(MachineState *ms)
 
     s->intx_set_mask = kvm_check_extension(s, KVM_CAP_PCI_2_3);
 
-    s->irq_set_ioctl = KVM_IRQ_LINE;
+    s->irq_set_ioctl = KVM_IRQ_LINE; //refer to %kvm_set_irq
     if (kvm_check_extension(s, KVM_CAP_IRQ_INJECT_STATUS)) {
         s->irq_set_ioctl = KVM_IRQ_LINE_STATUS;
     }

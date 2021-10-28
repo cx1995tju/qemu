@@ -77,7 +77,7 @@ static void pc_init1(MachineState *machine,
     int piix3_devfn = -1;
     qemu_irq *i8259;
     qemu_irq smi_irq;
-    GSIState *gsi_state;
+    GSIState *gsi_state; //表示虚拟机的中断状态
     DriveInfo *hd[MAX_IDE_BUS * MAX_IDE_DEVS];
     BusState *idebus[MAX_IDE_BUS];
     ISADevice *rtc_state;
@@ -185,7 +185,7 @@ static void pc_init1(MachineState *machine,
     gsi_state = g_malloc0(sizeof(*gsi_state));
     if (kvm_ioapic_in_kernel()) {
         kvm_pc_setup_irq_routing(pcmc->pci_enabled);
-        pcms->gsi = qemu_allocate_irqs(kvm_pc_gsi_handler, gsi_state,
+        pcms->gsi = qemu_allocate_irqs(kvm_pc_gsi_handler, gsi_state, //将表示虚拟机中断状态的结构保存了, 作为kvm_pc_gsi_handler的参数
                                        GSI_NUM_PINS);
     } else {
         pcms->gsi = qemu_allocate_irqs(gsi_handler, gsi_state, GSI_NUM_PINS);
@@ -210,7 +210,7 @@ static void pc_init1(MachineState *machine,
     isa_bus_irqs(isa_bus, pcms->gsi);
 
     if (kvm_pic_in_kernel()) {
-        i8259 = kvm_i8259_init(isa_bus);
+        i8259 = kvm_i8259_init(isa_bus); //创建PIC设备，即两个8259A芯片
     } else if (xen_enabled()) {
         i8259 = xen_interrupt_controller_init();
     } else {

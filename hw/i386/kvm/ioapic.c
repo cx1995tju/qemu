@@ -46,6 +46,7 @@ void kvm_pc_setup_irq_routing(bool pci_enabled)
     }
 }
 
+//refert to pc_init1->qemu_allocate_irqs
 void kvm_pc_gsi_handler(void *opaque, int n, int level)
 {
     GSIState *s = opaque;

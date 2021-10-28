@@ -28,20 +28,23 @@
 
 #define IRQ(obj) OBJECT_CHECK(struct IRQState, (obj), TYPE_IRQ)
 
+//表示一个中断引脚
 struct IRQState {
     Object parent_obj;
 
-    qemu_irq_handler handler;
-    void *opaque;
-    int n;
+    qemu_irq_handler handler; //表示执行函数
+    void *opaque; //参数
+    int n; //引脚号
 };
 
+//设备可以调用这个函数来触发中断
+//触发irq号中断，触发电平是level
 void qemu_set_irq(qemu_irq irq, int level)
 {
     if (!irq)
         return;
 
-    irq->handler(irq->opaque, irq->n, level);
+    irq->handler(irq->opaque, irq->n, level); //%kvm_pic_set_irq, 最终的触发当然还是要落实到KVM侧（前提：KVM参与中断芯片模拟）
 }
 
 qemu_irq *qemu_extend_irqs(qemu_irq *old, int n_old, qemu_irq_handler handler,
@@ -60,6 +63,7 @@ qemu_irq *qemu_extend_irqs(qemu_irq *old, int n_old, qemu_irq_handler handler,
     return s;
 }
 
+//分配一组中断引脚
 qemu_irq *qemu_allocate_irqs(qemu_irq_handler handler, void *opaque, int n)
 {
     return qemu_extend_irqs(NULL, 0, handler, opaque, n);
