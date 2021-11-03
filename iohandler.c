@@ -56,6 +56,7 @@ GSource *iohandler_get_g_source(void)
     return aio_get_g_source(iohandler_ctx);
 }
 
+//fd加入到iohandler_ctx的AioContext中监听
 void qemu_set_fd_handler(int fd,
                          IOHandler *fd_read,
                          IOHandler *fd_write,

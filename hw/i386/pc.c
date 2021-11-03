@@ -1641,13 +1641,13 @@ void pc_nic_init(ISABus *isa_bus, PCIBus *pci_bus)
     int i;
 
     rom_set_order_override(FW_CFG_ORDER_OVERRIDE_NIC);
-    for (i = 0; i < nb_nics; i++) {
+    for (i = 0; i < nb_nics; i++) { //遍历nd_tabls数组，然后做初始化, 因为前端网卡创建的时候，网卡信息都存储在这里
         NICInfo *nd = &nd_table[i];
 
         if (!pci_bus || (nd->model && strcmp(nd->model, "ne2k_isa") == 0)) {
-            pc_init_ne2k_isa(isa_bus, nd);
+            pc_init_ne2k_isa(isa_bus, nd); //没有pci bus才会进入这里
         } else {
-            pci_nic_init_nofail(nd, pci_bus, "e1000", NULL);
+            pci_nic_init_nofail(nd, pci_bus, "e1000", NULL); //e1000是默认网卡类型
         }
     }
     rom_reset_order_override();

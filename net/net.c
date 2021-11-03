@@ -54,7 +54,7 @@
 #endif
 
 static VMChangeStateEntry *net_change_state_entry;
-static QTAILQ_HEAD(, NetClientState) net_clients;
+static QTAILQ_HEAD(, NetClientState) net_clients; //链接所有的NetClientState结构
 
 const char *host_net_devices[] = {
     "tap",
@@ -236,6 +236,7 @@ static void qemu_net_client_destructor(NetClientState *nc)
     g_free(nc);
 }
 
+//nc表示前端网卡设备，peer表示后端网卡队列
 static void qemu_net_client_setup(NetClientState *nc,
                                   NetClientInfo *info,
                                   NetClientState *peer,
@@ -253,10 +254,10 @@ static void qemu_net_client_setup(NetClientState *nc,
 
     if (peer) {
         assert(!peer->peer);
-        nc->peer = peer;
+        nc->peer = peer; //这里将前后端的设备进行绑定
         peer->peer = nc;
     }
-    QTAILQ_INSERT_TAIL(&net_clients, nc, next);
+    QTAILQ_INSERT_TAIL(&net_clients, nc, next); //重点，将后端网卡结构挂载到net_clients链上，方便查找
 
     nc->incoming_queue = qemu_new_net_queue(qemu_deliver_packet_iov, nc);
     nc->destructor = destructor;
@@ -268,7 +269,7 @@ NetClientState *qemu_new_net_client(NetClientInfo *info,
                                     const char *model,
                                     const char *name)
 {
-    NetClientState *nc;
+    NetClientState *nc; //核心就是创建这个结构，并且赋值，其实创建的可能是一个更大的父结构 %TAPState
 
     assert(info->size >= sizeof(NetClientState));
 
@@ -285,7 +286,7 @@ NICState *qemu_new_nic(NetClientInfo *info,
                        const char *name,
                        void *opaque)
 {
-    NetClientState **peers = conf->peers.ncs;
+    NetClientState **peers = conf->peers.ncs; //核心结构, 在set_netdev中已经赋值初始化了，指向其对应的后端设备队列了
     NICState *nic;
     int i, queues = MAX(1, conf->peers.queues);
 
@@ -297,7 +298,7 @@ NICState *qemu_new_nic(NetClientInfo *info,
     nic->conf = conf;
     nic->opaque = opaque;
 
-    for (i = 0; i < queues; i++) {
+    for (i = 0; i < queues; i++) { //对应的后端设备，逐队列设置
         qemu_net_client_setup(&nic->ncs[i], info, peers[i], model, name,
                               NULL);
         nic->ncs[i].queue_index = i;
@@ -870,7 +871,7 @@ static int net_init_nic(const Netdev *netdev, const char *name,
                         NetClientState *peer, Error **errp)
 {
     int idx;
-    NICInfo *nd;
+    NICInfo *nd; //核心就是构建这个网卡的信息结构
     const NetLegacyNicOptions *nic;
 
     assert(netdev->type == NET_CLIENT_DRIVER_NIC);
@@ -882,12 +883,12 @@ static int net_init_nic(const Netdev *netdev, const char *name,
         return -1;
     }
 
-    nd = &nd_table[idx];
+    nd = &nd_table[idx]; //找一个空闲项
 
     memset(nd, 0, sizeof(*nd));
 
     if (nic->has_netdev) {
-        nd->netdev = qemu_find_netdev(nic->netdev);
+        nd->netdev = qemu_find_netdev(nic->netdev); //找到指定的netdev设备，赋值过去
         if (!nd->netdev) {
             error_setg(errp, "netdev '%s' not found", nic->netdev);
             return -1;
@@ -904,6 +905,7 @@ static int net_init_nic(const Netdev *netdev, const char *name,
         nd->devaddr = g_strdup(nic->addr);
     }
 
+    //然后配置各种参数
     if (nic->has_macaddr &&
         net_parse_macaddr(nd->macaddr.a, nic->macaddr) < 0) {
         error_setg(errp, "invalid syntax for ethernet address");
@@ -915,7 +917,7 @@ static int net_init_nic(const Netdev *netdev, const char *name,
                    "NIC cannot have multicast MAC address (odd 1st byte)");
         return -1;
     }
-    qemu_macaddr_default_if_unset(&nd->macaddr);
+    qemu_macaddr_default_if_unset(&nd->macaddr); //如果没有配置mac，这里会随机产生一个mac的
 
     if (nic->has_vectors) {
         if (nic->vectors > 0x7ffffff) {
@@ -938,7 +940,7 @@ static int (* const net_client_init_fun[NET_CLIENT_DRIVER__MAX])(
     const Netdev *netdev,
     const char *name,
     NetClientState *peer, Error **errp) = {
-        [NET_CLIENT_DRIVER_NIC]       = net_init_nic,
+        [NET_CLIENT_DRIVER_NIC]       = net_init_nic, //前端设备
 #ifdef CONFIG_SLIRP
         [NET_CLIENT_DRIVER_USER]      = net_init_slirp,
 #endif
@@ -975,14 +977,14 @@ static int net_client_init1(const void *object, bool is_netdev, Error **errp)
         netdev = object;
         name = netdev->id;
 
-        if (netdev->type == NET_CLIENT_DRIVER_DUMP ||
+        if (netdev->type == NET_CLIENT_DRIVER_DUMP || //如果是netdev比较简单，其表示的是后端设备，调用对应类型的回调函数就可以了
             netdev->type == NET_CLIENT_DRIVER_NIC ||
-            !net_client_init_fun[netdev->type]) {
+            !net_client_init_fun[netdev->type]) { //%net_init_tap
             error_setg(errp, QERR_INVALID_PARAMETER_VALUE, "type",
                        "a netdev backend type");
             return -1;
         }
-    } else {
+    } else { //非netdev类型，譬如net类型，其表示的是一个前端网卡设备，这里仅仅是用参数来初始化一个类型是Netdev的变量netdev
         const NetLegacy *net = object;
         const NetLegacyOptions *opts = net->opts;
         legacy.id = net->id;
@@ -1038,7 +1040,7 @@ static int net_client_init1(const void *object, bool is_netdev, Error **errp)
             abort();
         }
 
-        if (!net_client_init_fun[netdev->type]) {
+        if (!net_client_init_fun[netdev->type]) { //%net_init_nic	`-net nic`
             error_setg(errp, QERR_INVALID_PARAMETER_VALUE, "type",
                        "a net backend type (maybe it is not compiled "
                        "into this binary)");
@@ -1046,7 +1048,7 @@ static int net_client_init1(const void *object, bool is_netdev, Error **errp)
         }
 
         /* Do not add to a vlan if it's a nic with a netdev= parameter. */
-        if (netdev->type != NET_CLIENT_DRIVER_NIC ||
+        if (netdev->type != NET_CLIENT_DRIVER_NIC || //如果是一个后端设备，或者前端设备没有指定对应的后端的时候，会进入这里
             !opts->u.nic.data->has_netdev) {
             peer = net_hub_add_port(net->has_vlan ? net->vlan : 0, NULL);
         }
@@ -1102,11 +1104,12 @@ int net_client_init(QemuOpts *opts, bool is_netdev, Error **errp)
         }
     }
 
-    if (is_netdev) {
+    if (is_netdev) { //netdev的解析
         visit_type_Netdev(v, NULL, (Netdev **)&object, &err);
-    } else {
+    } else { //非netdev的解析
         visit_type_NetLegacy(v, NULL, (NetLegacy **)&object, &err);
     }
+    //解析完后，参数保存在object中
 
     if (!err) {
         ret = net_client_init1(object, is_netdev, &err);
@@ -1509,21 +1512,22 @@ static int net_init_netdev(void *dummy, QemuOpts *opts, Error **errp)
     return ret;
 }
 
+//两个大类参数的解析`-net` `-netdev`
 int net_init_clients(void)
 {
-    QemuOptsList *net = qemu_find_opts("net");
+    QemuOptsList *net = qemu_find_opts("net"); //这是拿了整个net大类的所有网卡
 
     net_change_state_entry =
         qemu_add_vm_change_state_handler(net_vm_change_state_handler, NULL);
 
-    QTAILQ_INIT(&net_clients);
+    QTAILQ_INIT(&net_clients); //初始化了一个net_clients列表, 方便查找前端网卡的一个list
 
     if (qemu_opts_foreach(qemu_find_opts("netdev"),
-                          net_init_netdev, NULL, NULL)) {
+                          net_init_netdev, NULL, NULL)) { //netdev参数用这个解析
         return -1;
     }
 
-    if (qemu_opts_foreach(net, net_init_client, NULL, NULL)) {
+    if (qemu_opts_foreach(net, net_init_client, NULL, NULL)) { //net参数，用net_init_client来解析
         return -1;
     }
 

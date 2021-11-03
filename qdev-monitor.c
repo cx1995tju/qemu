@@ -413,6 +413,7 @@ static inline bool qbus_is_full(BusState *bus)
  * If more than one exists, prefer one that can take another device.
  * Return the bus if found, else %NULL.
  */
+//根据bus类型，找bus，返回对应QOM类型BUS的C类型结构体BusState
 static BusState *qbus_find_recursive(BusState *bus, const char *name,
                                      const char *bus_typename)
 {
@@ -433,7 +434,7 @@ static BusState *qbus_find_recursive(BusState *bus, const char *name,
 
     pick = match ? bus : NULL;
 
-    QTAILQ_FOREACH(kid, &bus->children, sibling) {
+    QTAILQ_FOREACH(kid, &bus->children, sibling) { //遍历bus下的所有children设备，如果设备还挂载有总线，会遍历所有总线的
         DeviceState *dev = kid->child;
         QLIST_FOREACH(child, &dev->child_bus, sibling) {
             ret = qbus_find_recursive(child, name, bus_typename);
@@ -557,6 +558,7 @@ void qdev_set_id(DeviceState *dev, const char *id)
     }
 }
 
+//根据参数来添加设备 % `-device pci-ohci`
 DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
 {
     DeviceClass *dc;
@@ -572,7 +574,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
     }
 
     /* find driver */
-    dc = qdev_get_device_class(&driver, errp);
+    dc = qdev_get_device_class(&driver, errp); //找到对应的DeviceClass
     if (!dc) {
         return NULL;
     }
@@ -589,7 +591,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
                        driver, object_get_typename(OBJECT(bus)));
             return NULL;
         }
-    } else if (dc->bus_type != NULL) {
+    } else if (dc->bus_type != NULL) { //没有指定bus的话，就使用dc的bus_type
         bus = qbus_find_recursive(sysbus_get_default(), NULL, dc->bus_type);
         if (!bus || qbus_is_full(bus)) {
             error_setg(errp, "No '%s' bus found for device '%s'",
@@ -603,10 +605,10 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
     }
 
     /* create device */
-    dev = DEVICE(object_new(driver));
+    dev = DEVICE(object_new(driver)); //创建设备
 
     if (bus) {
-        qdev_set_parent_bus(dev, bus);
+        qdev_set_parent_bus(dev, bus); //挂载设备到找到的bus上
     }
 
     qdev_set_id(dev, qemu_opts_id(opts));
@@ -620,7 +622,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
     }
 
     dev->opts = opts;
-    object_property_set_bool(OBJECT(dev), true, "realized", &err);
+    object_property_set_bool(OBJECT(dev), true, "realized", &err); //具现化设备, 对于USB控制器来说，会在其上添加一个usb.0总线
     if (err != NULL) {
         error_propagate(errp, err);
         dev->opts = NULL;

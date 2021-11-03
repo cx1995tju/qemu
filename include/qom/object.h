@@ -367,6 +367,7 @@ typedef void (ObjectFree)(void *obj);
  * The base for all classes.  The only thing that #ObjectClass contains is an
  * integer type handle.
  */
+//类似于C++类的静态成员
 struct ObjectClass
 {
     /*< private >*/

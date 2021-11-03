@@ -74,17 +74,20 @@ int qbus_walk_children(BusState *bus,
     return 0;
 }
 
+//然后realize, 但这不是具现化，因为没有将realize属性设置为true
 static void qbus_realize(BusState *bus, DeviceState *parent, const char *name)
 {
     const char *typename = object_get_typename(OBJECT(bus));
     BusClass *bc;
     int i, bus_id;
 
+    //bus parent的设置
     bus->parent = parent;
 
-    if (name) {
+    //bus->name的设置
+    if (name) { //有name，用name
         bus->name = g_strdup(name);
-    } else if (bus->parent && bus->parent->id) {
+    } else if (bus->parent && bus->parent->id) { //没有name，有parent，和parent的id，用这个来生成name
         /* parent device has id -> use it plus parent-bus-id for bus name */
         bus_id = bus->parent->num_child_bus;
         bus->name = g_strdup_printf("%s.%d", bus->parent->id, bus_id);
@@ -92,16 +95,17 @@ static void qbus_realize(BusState *bus, DeviceState *parent, const char *name)
         /* no id -> use lowercase bus type plus global bus-id for bus name */
         bc = BUS_GET_CLASS(bus);
         bus_id = bc->automatic_ids++;
-        bus->name = g_strdup_printf("%s.%d", typename, bus_id);
+        bus->name = g_strdup_printf("%s.%d", typename, bus_id); //用typename + bus_id 来生成name
         for (i = 0; bus->name[i]; i++) {
             bus->name[i] = qemu_tolower(bus->name[i]);
         }
     }
 
+    //设置总线和父设备的关系
     if (bus->parent) {
-        QLIST_INSERT_HEAD(&bus->parent->child_bus, bus, sibling);
+        QLIST_INSERT_HEAD(&bus->parent->child_bus, bus, sibling); //总线挂载到其所属设备的child bus上
         bus->parent->num_child_bus++;
-        object_property_add_child(OBJECT(bus->parent), bus->name, OBJECT(bus), NULL);
+        object_property_add_child(OBJECT(bus->parent), bus->name, OBJECT(bus), NULL); //child关系
         object_unref(OBJECT(bus));
     } else if (bus != sysbus_get_default()) {
         /* TODO: once all bus devices are qdevified,
@@ -129,19 +133,23 @@ static void bus_unparent(Object *obj)
     }
 }
 
+//总线的创建，bus的空间已经分配了
+//typename, 总线的QOM类型名字, %TYPE_BUS
+//parent, 是总线所在设备，譬如：北桥
 void qbus_create_inplace(void *bus, size_t size, const char *typename,
                          DeviceState *parent, const char *name)
 {
-    object_initialize(bus, size, typename);
-    qbus_realize(bus, parent, name);
+    object_initialize(bus, size, typename); //构造函数
+    qbus_realize(bus, parent, name); 
 }
 
+//总线创建，parent是其需要挂载的设备，譬如：主桥芯片
 BusState *qbus_create(const char *typename, DeviceState *parent, const char *name)
 {
     BusState *bus;
 
-    bus = BUS(object_new(typename));
-    qbus_realize(bus, parent, name);
+    bus = BUS(object_new(typename)); //需要在内部分配bus结构, object_new中会调用构造函数的
+    qbus_realize(bus, parent, name); //然后realize, 但这不是具现化，因为没有将realize属性设置为true
 
     return bus;
 }
@@ -153,6 +161,8 @@ static bool bus_get_realized(Object *obj, Error **errp)
     return bus->realized;
 }
 
+//value为true表示具现设备
+//false表示销毁设备
 static void bus_set_realized(Object *obj, bool value, Error **errp)
 {
     BusState *bus = BUS(obj);
@@ -200,7 +210,7 @@ static void qbus_initfn(Object *obj)
                              OBJ_PROP_LINK_UNREF_ON_RELEASE,
                              NULL);
     object_property_add_bool(obj, "realized",
-                             bus_get_realized, bus_set_realized, NULL);
+                             bus_get_realized, bus_set_realized, NULL); //realize是一个bool类型属性
 }
 
 static char *default_bus_get_fw_dev_path(DeviceState *dev)

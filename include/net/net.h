@@ -28,7 +28,7 @@ struct MACAddr {
 /* qdev nic properties */
 
 typedef struct NICPeers {
-    NetClientState *ncs[MAX_QUEUE_NUM];
+    NetClientState *ncs[MAX_QUEUE_NUM]; //前端网卡对应的后端设备的NetClientState, 一个队列一个, 最多1024个队列
     int32_t queues;
 } NICPeers;
 
@@ -41,7 +41,7 @@ typedef struct NICConf {
 #define DEFINE_NIC_PROPERTIES(_state, _conf)                            \
     DEFINE_PROP_MACADDR("mac",   _state, _conf.macaddr),                \
     DEFINE_PROP_VLAN("vlan",     _state, _conf.peers),                   \
-    DEFINE_PROP_NETDEV("netdev", _state, _conf.peers)
+    DEFINE_PROP_NETDEV("netdev", _state, _conf.peers) //netdev属性
 
 
 /* Net clients */
@@ -68,7 +68,7 @@ typedef void (SocketReadStateFinalize)(SocketReadState *rs);
 typedef struct NetClientInfo {
     NetClientDriver type;
     size_t size;
-    NetReceive *receive;
+    NetReceive *receive; //用于收包的回调函数
     NetReceive *receive_raw;
     NetReceiveIOV *receive_iov;
     NetCanReceive *can_receive;
@@ -86,23 +86,27 @@ typedef struct NetClientInfo {
     SetVnetBE *set_vnet_be;
 } NetClientInfo;
 
+//连接前后端网卡的端点结构，per-queue的
+//refer to: net_init_tap -> for queue loop: net_init_tap_one -> net_tap_fd_init	//后端设备该结构的设置示例
+//refer to: pci_e1000_realize -> qemu_new)nic -> for queue loop: qemu_net_client_setup //前端设备该结构的设置示例
 struct NetClientState {
-    NetClientInfo *info;
-    int link_down;
+    NetClientInfo *info; //网卡基本信息, 主要是一些注册相关的信息,%net_e1000_info; tap设备就是 %net_tap_info   refer to: net_tap_fd_init->qemu_new_net_client
+    int link_down; //down没down
     QTAILQ_ENTRY(NetClientState) next;
-    NetClientState *peer;
-    NetQueue *incoming_queue;
-    char *model;
+    NetClientState *peer; //这里是绑定的关键，对应的两个前后端设备的队列，互相指向, 指向对端
+    NetQueue *incoming_queue; //该端点对应的 接收队列
+    char *model; //下面是网卡基本信息
     char *name;
     char info_str[256];
-    unsigned receive_disabled : 1;
-    NetClientDestructor *destructor;
-    unsigned int queue_index;
+    unsigned receive_disabled : 1; //是否禁止收包
+    NetClientDestructor *destructor; //该结构删除时候的析构函数
+    unsigned int queue_index; //队列编号，即在虚拟网卡NICState中的索引
     unsigned rxfilter_notify_enabled:1;
     int vring_enable;
-    QTAILQ_HEAD(NetFilterHead, NetFilterState) filters;
+    QTAILQ_HEAD(NetFilterHead, NetFilterState) filters; //包路由的时候做过滤
 };
 
+//表示一个前端虚拟网卡
 typedef struct NICState {
     NetClientState *ncs;
     NICConf *conf;
@@ -182,12 +186,13 @@ void net_socket_rs_init(SocketReadState *rs,
 
 #define MAX_NICS 8
 
+//网卡信息, 仅仅是信息，不是某个具体的设备
 struct NICInfo {
     MACAddr macaddr;
     char *model;
     char *name;
     char *devaddr;
-    NetClientState *netdev;
+    NetClientState *netdev; //存储对应的后端设备结构,后续用这个信息构建前端网卡设备的时候，用来建立真正的联系
     int used;         /* is this slot in nd_table[] being used? */
     int instantiated; /* does this NICInfo correspond to an instantiated NIC? */
     int nvectors;

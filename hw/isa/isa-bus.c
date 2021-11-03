@@ -51,6 +51,7 @@ static const TypeInfo isa_bus_info = {
     .class_init = isa_bus_class_init,
 };
 
+//dev是isa bus需要挂载的父设备
 ISABus *isa_bus_new(DeviceState *dev, MemoryRegion* address_space,
                     MemoryRegion *address_space_io, Error **errp)
 {

@@ -27,7 +27,7 @@ struct PCIBus {
     pci_map_irq_fn map_irq;
     pci_route_irq_fn route_intx_to_irq;
     void *irq_opaque;
-    PCIDevice *devices[PCI_SLOT_MAX * PCI_FUNC_MAX];
+    PCIDevice *devices[PCI_SLOT_MAX * PCI_FUNC_MAX]; //保存bus上相关设备信息
     PCIDevice *parent_dev;
     MemoryRegion *address_space_mem;
     MemoryRegion *address_space_io;

@@ -138,8 +138,8 @@ ram_addr_t ram_size;
 const char *mem_path = NULL;
 int mem_prealloc = 0; /* force preallocation of physical target memory */
 bool enable_mlock = false;
-int nb_nics;
-NICInfo nd_table[MAX_NICS];
+int nb_nics;	//保存当前网卡数目
+NICInfo nd_table[MAX_NICS]; //全局数组变量，保存所有网卡信息, 其大小表示了一个虚拟机支持的最多的网卡数目
 int autostart;
 static int rtc_utc = 1;
 static int rtc_date_offset = -1; /* -1 means no change */
@@ -4436,7 +4436,7 @@ int main(int argc, char **argv, char **envp)
 
     colo_info_init();
 
-    if (net_init_clients() < 0) {
+    if (net_init_clients() < 0) { //网卡参数的初始化与解析
         exit(1);
     }
 

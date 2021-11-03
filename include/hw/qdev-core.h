@@ -91,15 +91,16 @@ struct VMStateDescription;
  *   </para>
  * </note>
  */
+//这个结构还是类似于C++中的类的静态成员的意思, 保存一些共享的信息，譬如：realize函数
 typedef struct DeviceClass {
     /*< private >*/
     ObjectClass parent_class;
     /*< public >*/
 
-    DECLARE_BITMAP(categories, DEVICE_CATEGORY_MAX);
-    const char *fw_name;
-    const char *desc;
-    Property *props;
+    DECLARE_BITMAP(categories, DEVICE_CATEGORY_MAX); //设备种类，譬如DEVICE_CATEGORY_USB表示USB设备
+    const char *fw_name; //生产设备在固件中的路径
+    const char *desc; //描述设备
+    Property *props; //设备属性 C类型的 DeviceState 对应的QOM类型 TYPE_DEVICE 的对象构造函数 device_initfn 中添加了这里定义的prop
 
     /*
      * Shall we hide this device model from -device / device_add?
@@ -125,15 +126,15 @@ typedef struct DeviceClass {
      */
     bool cannot_destroy_with_object_finalize_yet;
 
-    bool hotpluggable;
+    bool hotpluggable; //是否支持热插拔
 
     /* callbacks */
-    void (*reset)(DeviceState *dev);
-    DeviceRealize realize;
-    DeviceUnrealize unrealize;
+    void (*reset)(DeviceState *dev); //reset的 cb
+    DeviceRealize realize; //realize的cb
+    DeviceUnrealize unrealize; //unrealize的cb
 
     /* device state */
-    const struct VMStateDescription *vmsd;
+    const struct VMStateDescription *vmsd; //设备状态，虚拟机迁移的时候，需要记录设备状态
 
     /* Private to qdev / bus.  */
     qdev_initfn init; /* TODO remove, once users are converted to realize */
@@ -158,22 +159,23 @@ struct NamedGPIOList {
  * This structure should not be accessed directly.  We declare it here
  * so that it can be embedded in individual device state structures.
  */
+//QOM类型 TYPE_DEVICE
 struct DeviceState {
     /*< private >*/
     Object parent_obj;
     /*< public >*/
 
-    const char *id;
-    bool realized;
-    bool pending_deleted_event;
-    QemuOpts *opts;
-    int hotplugged;
-    BusState *parent_bus;
-    QLIST_HEAD(, NamedGPIOList) gpios;
-    QLIST_HEAD(, BusState) child_bus;
-    int num_child_bus;
-    int instance_id_alias;
-    int alias_required_for_version;
+    const char *id; //设备名
+    bool realized; //是否realize？
+    bool pending_deleted_event; //用于设备示例销毁的时候判断设备是否已经realize，如果是的话需要发送DEVICE_DELETED事件
+    QemuOpts *opts; //设备对应的参数
+    int hotplugged; //是否是通过热插拔进入的系统
+    BusState *parent_bus; //设备挂载的总线
+    QLIST_HEAD(, NamedGPIOList) gpios; //一个表示NamedGPIOList的链表头，用来连接GPIO，相当于设备的输入输出，用来模拟硬件的pin脚
+    QLIST_HEAD(, BusState) child_bus; //组织挂载在该设备上的所有总线
+    int num_child_bus; //总线的序号
+    int instance_id_alias; //热迁移中表示当前虚拟机的实例，迁移一次就++
+    int alias_required_for_version; //用于热迁移的时候，只有当这个值大于等于设备的VMStateDescription的minimum_version_id的时候设备才能进行
 };
 
 struct DeviceListener {

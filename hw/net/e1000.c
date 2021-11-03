@@ -80,7 +80,7 @@ typedef struct E1000State_st {
     /*< public >*/
 
     NICState *nic;
-    NICConf conf;
+    NICConf conf; //网卡的一些配置信息, 譬如：后端设备相关信息, 各种类型的网卡设备都应该有这个成员 %set_netdev
     MemoryRegion mmio;
     MemoryRegion io;
 
@@ -1591,7 +1591,7 @@ static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
     uint8_t *pci_conf;
     uint8_t *macaddr;
 
-    pci_dev->config_write = e1000_write_config;
+    pci_dev->config_write = e1000_write_config; //pci相关的一些函数
 
     pci_conf = pci_dev->config;
 
@@ -1600,13 +1600,13 @@ static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
 
     pci_conf[PCI_INTERRUPT_PIN] = 1; /* interrupt pin A */
 
-    e1000_mmio_setup(d);
+    e1000_mmio_setup(d); //mmio读写设置
 
-    pci_register_bar(pci_dev, 0, PCI_BASE_ADDRESS_SPACE_MEMORY, &d->mmio);
+    pci_register_bar(pci_dev, 0, PCI_BASE_ADDRESS_SPACE_MEMORY, &d->mmio); //pci bar设置
 
     pci_register_bar(pci_dev, 1, PCI_BASE_ADDRESS_SPACE_IO, &d->io);
 
-    qemu_macaddr_default_if_unset(&d->conf.macaddr);
+    qemu_macaddr_default_if_unset(&d->conf.macaddr); //分配mac地址
     macaddr = d->conf.macaddr.a;
 
     e1000x_core_prepare_eeprom(d->eeprom_data,
@@ -1615,6 +1615,7 @@ static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
                                PCI_DEVICE_GET_CLASS(pci_dev)->device_id,
                                macaddr);
 
+    //创建一个新的网卡设备了
     d->nic = qemu_new_nic(&net_e1000_info, &d->conf,
                           object_get_typename(OBJECT(d)), dev->id, d);
 
@@ -1667,7 +1668,7 @@ static void e1000_class_init(ObjectClass *klass, void *data)
     dc->desc = "Intel Gigabit Ethernet";
     dc->reset = qdev_e1000_reset;
     dc->vmsd = &vmstate_e1000;
-    dc->props = e1000_properties;
+    dc->props = e1000_properties; //TYPE_DEVICE对象初始化的时候会添加属性的
 }
 
 static void e1000_instance_init(Object *obj)

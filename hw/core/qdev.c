@@ -100,6 +100,7 @@ static void bus_add_child(BusState *bus, DeviceState *child)
                              NULL);
 }
 
+//将设备挂载到总线上
 void qdev_set_parent_bus(DeviceState *dev, BusState *bus)
 {
     dev->parent_bus = bus;
@@ -110,7 +111,7 @@ void qdev_set_parent_bus(DeviceState *dev, BusState *bus)
 /* Create a new device.  This only initializes the device state
    structure and allows properties to be set.  The device still needs
    to be realized.  See qdev-core.h.  */
-//第一个参数表示设备所属bus，如果是NULL， 表示系统总线, 即设备会被挂载在系统总线
+//第一个参数表示设备所属bus，如果是NULL， 表示系统总线, 即设备会被挂载在系统总线main_system_bus
 DeviceState *qdev_create(BusState *bus, const char *name)
 {
     DeviceState *dev;
@@ -136,12 +137,12 @@ DeviceState *qdev_try_create(BusState *bus, const char *type)
     if (object_class_by_name(type) == NULL) {
         return NULL;
     }
-    dev = DEVICE(object_new(type));
+    dev = DEVICE(object_new(type)); //new 一个设备QOM对象
     if (!dev) {
         return NULL;
     }
 
-    if (!bus) {
+    if (!bus) { //没有bus的话，将main_system_bus作为其总线
         /* Assert that the device really is a SysBusDevice before
          * we put it onto the sysbus. Non-sysbus devices which aren't
          * being put onto a bus should be created with object_new(TYPE_FOO),
@@ -151,7 +152,7 @@ DeviceState *qdev_try_create(BusState *bus, const char *type)
         bus = sysbus_get_default();
     }
 
-    qdev_set_parent_bus(dev, bus);
+    qdev_set_parent_bus(dev, bus); //设备挂载到bus上
     object_unref(OBJECT(dev));
     return dev;
 }

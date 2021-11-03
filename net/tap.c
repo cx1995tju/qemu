@@ -69,6 +69,7 @@ static void tap_writable(void *opaque);
 
 static void tap_update_fd_handler(TAPState *s)
 {
+	//将tap设备的fd加入到iohandler_ctx的AioContext中，这样可以被事件监听了
     qemu_set_fd_handler(s->fd,
                         s->read_poll && s->enabled ? tap_send : NULL,
                         s->write_poll && s->enabled ? tap_writable : NULL,
@@ -367,14 +368,14 @@ static TAPState *net_tap_fd_init(NetClientState *peer,
                                  int fd,
                                  int vnet_hdr)
 {
-    NetClientState *nc;
+    NetClientState *nc; //核心就是创建这个结构
     TAPState *s;
 
-    nc = qemu_new_net_client(&net_tap_info, peer, model, name);
+    nc = qemu_new_net_client(&net_tap_info, peer, model, name); //注册了一系列回调函数, %tap_receive
 
     s = DO_UPCAST(TAPState, nc, nc);
 
-    s->fd = fd;
+    s->fd = fd; //这里设置tap设备的fd非常重要
     s->host_vnet_hdr_len = vnet_hdr ? sizeof(struct virtio_net_hdr) : 0;
     s->using_vnet_hdr = false;
     s->has_ufo = tap_probe_has_ufo(s->fd);
@@ -387,7 +388,7 @@ static TAPState *net_tap_fd_init(NetClientState *peer,
     if (tap_probe_vnet_hdr_len(s->fd, s->host_vnet_hdr_len)) {
         tap_fd_set_vnet_hdr_len(s->fd, s->host_vnet_hdr_len);
     }
-    tap_read_poll(s, true);
+    tap_read_poll(s, true); //非常重要
     s->vhost_net = NULL;
 
     s->exit.notify = tap_exit_notify;
@@ -602,7 +603,7 @@ int net_init_bridge(const Netdev *netdev, const char *name,
 }
 
 static int net_tap_init(const NetdevTapOptions *tap, int *vnet_hdr,
-                        const char *setup_script, char *ifname,
+                        const char *setup_script, char *ifname, //通过设备名指定的tap设备
                         size_t ifname_sz, int mq_required, Error **errp)
 {
     Error *err = NULL;
@@ -638,6 +639,7 @@ static int net_tap_init(const NetdevTapOptions *tap, int *vnet_hdr,
 
 #define MAX_TAP_QUEUES 1024
 
+//这里就是一些纯粹的tap设备相关的设置了
 static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                              const char *model, const char *name,
                              const char *ifname, const char *script,
@@ -645,7 +647,7 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                              int vnet_hdr, int fd, Error **errp)
 {
     Error *err = NULL;
-    TAPState *s = net_tap_fd_init(peer, model, name, fd, vnet_hdr);
+    TAPState *s = net_tap_fd_init(peer, model, name, fd, vnet_hdr); //核心函数，创建TAPState 结构，并挂载到了net_clients链表上
     int vhostfd;
 
     tap_set_sndbuf(s->fd, tap, &err);
@@ -690,7 +692,7 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                 return;
             }
         } else {
-            vhostfd = open("/dev/vhost-net", O_RDWR);
+            vhostfd = open("/dev/vhost-net", O_RDWR); //vhost入口, tap设备通过vhost卸载了？？
             if (vhostfd < 0) {
                 error_setg_errno(errp, errno,
                                  "tap: open vhost char device failed");
@@ -739,7 +741,7 @@ static int get_fds(char *str, char *fds[], int max)
 int net_init_tap(const Netdev *netdev, const char *name,
                  NetClientState *peer, Error **errp)
 {
-    const NetdevTapOptions *tap;
+    const NetdevTapOptions *tap; //qapi自动生成的类型，参考qapi-schema.json
     int fd, vnet_hdr = 0, i = 0, queues;
     /* for the no-fd, no-helper case */
     const char *script = NULL; /* suppress wrong "uninit'd use" gcc warning */
@@ -749,7 +751,7 @@ int net_init_tap(const Netdev *netdev, const char *name,
     char ifname[128];
 
     assert(netdev->type == NET_CLIENT_DRIVER_TAP);
-    tap = &netdev->u.tap;
+    tap = &netdev->u.tap; //获取tap相关参数，
     queues = tap->has_queues ? tap->queues : 1;
     vhostfdname = tap->has_vhostfd ? tap->vhostfd : NULL;
 
@@ -759,7 +761,7 @@ int net_init_tap(const Netdev *netdev, const char *name,
         error_setg(errp, "Multiqueue tap cannot be used with QEMU vlans");
         return -1;
     }
-
+    // tap设备的指定方式很多的，有设备名，fd等等, 所以这里有很多种判断条件
     if (tap->has_fd) {
         if (tap->has_ifname || tap->has_script || tap->has_downscript ||
             tap->has_vnet_hdr || tap->has_helper || tap->has_queues ||
@@ -828,7 +830,7 @@ int net_init_tap(const Netdev *netdev, const char *name,
                 goto free_fail;
             }
 
-            net_init_tap_one(tap, peer, "tap", name, ifname,
+            net_init_tap_one(tap, peer, "tap", name, ifname,	//核心
                              script, downscript,
                              tap->has_vhostfds ? vhost_fds[i] : NULL,
                              vnet_hdr, fd, &err);
@@ -906,7 +908,7 @@ free_fail:
                 }
             }
 
-            net_init_tap_one(tap, peer, "tap", name, ifname,
+            net_init_tap_one(tap, peer, "tap", name, ifname, //有了tap设备的fd后，做进一步初始化
                              i >= 1 ? "no" : script,
                              i >= 1 ? "no" : downscript,
                              vhostfdname, vnet_hdr, fd, &err);

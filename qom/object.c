@@ -382,6 +382,7 @@ void object_initialize_with_type(void *data, size_t size, TypeImpl *type)
     object_post_init_with_type(obj, type);
 }
 
+//构造函数
 void object_initialize(void *data, size_t size, const char *typename)
 {
     TypeImpl *type = type_get_by_name(typename);
@@ -655,6 +656,7 @@ out:
 }
 
 //只有是后代能够强行转换为祖先，这里有多态的意思了
+//不同于c++是编译期去检查，这里在运行期间去检查明显影响效率呀
 ObjectClass *object_class_dynamic_cast(ObjectClass *class,
                                        const char *typename)
 {
@@ -1545,7 +1547,7 @@ static void object_release_link_property(Object *obj, const char *name,
 //  get 函数: object_get_link_property
 //  set 函数：objecty_set_link_property
 void object_property_add_link(Object *obj, const char *name,
-                              const char *type, Object **child, //注意，这里是一个child的二级指针, 这个child一般都是obj的一个指针成员的指针
+                              const char *type, Object **child, //注意，这里是一个child的二级指针,  **这个child一般都是obj的一个指针成员的指针**
                               void (*check)(Object *, const char *,
                                             Object *, Error **), //判断是否允许set link属性
                               ObjectPropertyLinkFlags flags,

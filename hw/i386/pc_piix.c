@@ -239,7 +239,7 @@ static void pc_init1(MachineState *machine,
     pc_basic_device_init(isa_bus, pcms->gsi, &rtc_state, true,
                          (pcms->vmport != ON_OFF_AUTO_ON), 0x4);
 
-    pc_nic_init(isa_bus, pci_bus); //nic初始化
+    pc_nic_init(isa_bus, pci_bus); //nic初始化, 关于nic的参数解析都已经结束了 `-net`参数
 
     ide_drive_get(hd, ARRAY_SIZE(hd)); //ide控制器
     if (pcmc->pci_enabled) {

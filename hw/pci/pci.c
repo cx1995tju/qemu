@@ -80,6 +80,7 @@ static const VMStateDescription vmstate_pcibus = {
     }
 };
 
+//初始化相关MR
 static void pci_init_bus_master(PCIDevice *pci_dev)
 {
     AddressSpace *dma_as = pci_device_iommu_address_space(pci_dev);
@@ -209,7 +210,7 @@ static void pci_change_irq_level(PCIDevice *pci_dev, int irq_num, int change)
     PCIBus *bus;
     for (;;) {
         bus = pci_dev->bus;
-        irq_num = bus->map_irq(pci_dev, irq_num);
+        irq_num = bus->map_irq(pci_dev, irq_num); // 拿到的设备对应的哪一个LNK[D|A|B|C], 这部分信息应该是记录在ACPI表中的, 或者有一个默认设置%pci_slot_get_pirq
         if (bus->set_irq)
             break;
         pci_dev = bus->parent_dev;
@@ -368,14 +369,14 @@ static void pci_bus_init(PCIBus *bus, DeviceState *parent,
                          uint8_t devfn_min)
 {
     assert(PCI_FUNC(devfn_min) == 0);
-    bus->devfn_min = devfn_min;
-    bus->address_space_mem = address_space_mem;
+    bus->devfn_min = devfn_min; //设备开始的插槽号
+    bus->address_space_mem = address_space_mem; //mem 和 io两个总线设备使用的地址空间
     bus->address_space_io = address_space_io;
 
     /* host bridge */
     QLIST_INIT(&bus->child);
 
-    pci_host_bus_register(parent);
+    pci_host_bus_register(parent); //将parent挂载到host bus上, 不是其自身, bus的parent是某个设备
 }
 
 bool pci_bus_is_express(PCIBus *bus)
@@ -406,7 +407,7 @@ PCIBus *pci_bus_new(DeviceState *parent, const char *name,
     PCIBus *bus;
 
     bus = PCI_BUS(qbus_create(typename, parent, name));
-    pci_bus_init(bus, parent, address_space_mem, address_space_io, devfn_min);
+    pci_bus_init(bus, parent, address_space_mem, address_space_io, devfn_min); //初始化pci总线
     return bus;
 }
 
@@ -839,6 +840,7 @@ static void pci_init_multifunction(PCIBus *bus, PCIDevice *dev, Error **errp)
     }
 }
 
+//分配PCI设备的配置空间
 static void pci_config_alloc(PCIDevice *pci_dev)
 {
     int config_size = pci_config_size(pci_dev);
@@ -943,6 +945,7 @@ uint16_t pci_requester_id(PCIDevice *dev)
 }
 
 /* -1 for devfn means auto assign */
+//完成设备以及PCI总线上的一些初始化工作
 static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
                                          const char *name, int devfn,
                                          Error **errp)
@@ -962,7 +965,7 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
         return NULL;
     }
 
-    if (devfn < 0) {
+    if (devfn < 0) { //自动分配slot
         for(devfn = bus->devfn_min ; devfn < ARRAY_SIZE(bus->devices);
             devfn += PCI_FUNC_MAX) {
             if (!bus->devices[devfn])
@@ -999,7 +1002,7 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
     pci_dev->irq_state = 0;
     pci_config_alloc(pci_dev);
 
-    pci_config_set_vendor_id(pci_dev->config, pc->vendor_id);
+    pci_config_set_vendor_id(pci_dev->config, pc->vendor_id); //设置配置空间中的各种域
     pci_config_set_device_id(pci_dev->config, pc->device_id);
     pci_config_set_revision(pci_dev->config, pc->revision);
     pci_config_set_class(pci_dev->config, pc->class_id);
@@ -1031,13 +1034,13 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
         return NULL;
     }
 
-    if (!config_read)
+    if (!config_read) //设置配置空间的读写函数
         config_read = pci_default_read_config;
     if (!config_write)
         config_write = pci_default_write_config;
     pci_dev->config_read = config_read;
     pci_dev->config_write = config_write;
-    bus->devices[devfn] = pci_dev;
+    bus->devices[devfn] = pci_dev; //复制到bus->devices数组保存
     pci_dev->version_id = 2; /* Current pci device vmstate version */
     return pci_dev;
 }
@@ -1072,6 +1075,7 @@ static void pci_qdev_unrealize(DeviceState *dev, Error **errp)
     do_pci_unregister_device(pci_dev);
 }
 
+//为pci设备注册一个bar
 void pci_register_bar(PCIDevice *pci_dev, int region_num,
                       uint8_t type, MemoryRegion *memory)
 {
@@ -1103,7 +1107,7 @@ void pci_register_bar(PCIDevice *pci_dev, int region_num,
         wmask |= PCI_ROM_ADDRESS_ENABLE;
     }
 
-    addr = pci_bar(pci_dev, region_num);
+    addr = pci_bar(pci_dev, region_num); //相关信息，写到相关的PCI设备模拟的bar上
     pci_set_long(pci_dev->config + addr, type);
 
     if (!(r->type & PCI_BASE_ADDRESS_SPACE_IO) &&
@@ -1357,15 +1361,15 @@ static void pci_irq_handler(void *opaque, int irq_num, int level)
     PCIDevice *pci_dev = opaque;
     int change;
 
-    change = level - pci_irq_state(pci_dev, irq_num);
+    change = level - pci_irq_state(pci_dev, irq_num); //首先判断中断线电平是否有变化, 没有变化的话直接退出
     if (!change)
         return;
 
-    pci_set_irq_state(pci_dev, irq_num, level);
-    pci_update_irq_status(pci_dev);
+    pci_set_irq_state(pci_dev, irq_num, level); //设置设备状态
+    pci_update_irq_status(pci_dev);//设置设备状态
     if (pci_irq_disabled(pci_dev))
         return;
-    pci_change_irq_level(pci_dev, irq_num, change);
+    pci_change_irq_level(pci_dev, irq_num, change); //触发中断
 }
 
 static inline int pci_intx(PCIDevice *pci_dev)
@@ -1380,9 +1384,10 @@ qemu_irq pci_allocate_irq(PCIDevice *pci_dev)
     return qemu_allocate_irq(pci_irq_handler, pci_dev, intx);
 }
 
+//pci设备触发中断, level表示拉高电平还是拉低电平
 void pci_set_irq(PCIDevice *pci_dev, int level)
 {
-    int intx = pci_intx(pci_dev);
+    int intx = pci_intx(pci_dev); //得到设备使用的INTX引脚
     pci_irq_handler(pci_dev, intx, level);
 }
 
@@ -1749,6 +1754,8 @@ PciInfoList *qmp_query_pci(Error **errp)
     return head;
 }
 
+
+//保存了所有支持的网卡信息
 static const char * const pci_nic_models[] = {
     "ne2k_pci",
     "i82551",
@@ -1774,6 +1781,7 @@ static const char * const pci_nic_names[] = {
 };
 
 /* Initialize a PCI NIC.  */
+//nd记录了从命令行参数获取的网卡信息
 PCIDevice *pci_nic_init_nofail(NICInfo *nd, PCIBus *rootbus,
                                const char *default_model,
                                const char *default_devaddr)
@@ -1790,23 +1798,24 @@ PCIDevice *pci_nic_init_nofail(NICInfo *nd, PCIBus *rootbus,
         exit(0);
     }
 
-    i = qemu_find_nic_model(nd, pci_nic_models, default_model);
+    i = qemu_find_nic_model(nd, pci_nic_models, default_model); //找到对应的网卡model
     if (i < 0) {
         exit(1);
     }
 
-    bus = pci_get_bus_devfn(&devfn, rootbus, devaddr);
+    bus = pci_get_bus_devfn(&devfn, rootbus, devaddr); //设备要挂载的bdf位置, 不指定的话，就会挂载到根pci总线
     if (!bus) {
         error_report("Invalid PCI device address %s for device %s",
                      devaddr, pci_nic_names[i]);
         exit(1);
     }
 
+    //接下来是创建pci设备，并进行初始化 具现化的标准操作
     pci_dev = pci_create(bus, devfn, pci_nic_names[i]);
     dev = &pci_dev->qdev;
-    qdev_set_nic_properties(dev, nd);
+    qdev_set_nic_properties(dev, nd); //各种属性的设置
 
-    object_property_set_bool(OBJECT(dev), true, "realized", &err);
+    object_property_set_bool(OBJECT(dev), true, "realized", &err); //realize it, %pci_e1000_realize, refer to: e1000_class_init
     if (err) {
         error_report_err(err);
         object_unparent(OBJECT(dev));
@@ -1962,7 +1971,7 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
     if (pci_dev == NULL)
         return;
 
-    if (pc->realize) {
+    if (pc->realize) { //具体pci设备的realize函数， %pci_edu_realize
         pc->realize(pci_dev, &local_err);
         if (local_err) {
             error_propagate(errp, local_err);
@@ -1978,7 +1987,7 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
         is_default_rom = true;
     }
 
-    pci_add_option_rom(pci_dev, is_default_rom, &local_err);
+    pci_add_option_rom(pci_dev, is_default_rom, &local_err); //加载pci设备的rom
     if (local_err) {
         error_propagate(errp, local_err);
         pci_qdev_unrealize(DEVICE(pci_dev), NULL);
@@ -2009,12 +2018,13 @@ PCIDevice *pci_create_multifunction(PCIBus *bus, int devfn, bool multifunction,
     return PCI_DEVICE(dev);
 }
 
+//devfn==-1,表示由bus自己选择slot
 PCIDevice *pci_create_simple_multifunction(PCIBus *bus, int devfn,
                                            bool multifunction,
                                            const char *name)
 {
     PCIDevice *dev = pci_create_multifunction(bus, devfn, multifunction, name);
-    qdev_init_nofail(&dev->qdev);
+    qdev_init_nofail(&dev->qdev); //具现化 %piix3_realize
     return dev;
 }
 
@@ -2135,6 +2145,9 @@ static void pci_patch_ids(PCIDevice *pdev, uint8_t *ptr, int size)
 }
 
 /* Add an option rom for the device */
+ //加载pci设备的rom
+ //如果在命令行中只指定了rom，没有提供rom文件，那么使用默认rom
+ //如果指定了romfile，那么使用该romfile作为设备的rom
 static void pci_add_option_rom(PCIDevice *pdev, bool is_default_rom,
                                Error **errp)
 {
@@ -2210,7 +2223,7 @@ static void pci_add_option_rom(PCIDevice *pdev, bool is_default_rom,
         pci_patch_ids(pdev, ptr, size);
     }
 
-    pci_register_bar(pdev, PCI_ROM_SLOT, 0, &pdev->rom);
+    pci_register_bar(pdev, PCI_ROM_SLOT, 0, &pdev->rom); //将rom设备注册到pci设备的bar上
 }
 
 static void pci_del_option_rom(PCIDevice *pdev)
@@ -2491,7 +2504,7 @@ static void pci_device_class_init(ObjectClass *klass, void *data)
 
     k->realize = pci_qdev_realize;
     k->unrealize = pci_qdev_unrealize;
-    k->bus_type = TYPE_PCI_BUS;
+    k->bus_type = TYPE_PCI_BUS; //所有PCI设备挂载的总线类型必然是PCI总线咯，所以这部分信息可以放置在DviceClass中
     k->props = pci_props;
     pc->realize = pci_default_realize;
 }

@@ -350,15 +350,15 @@ static void pci_edu_realize(PCIDevice *pdev, Error **errp)
     qemu_thread_create(&edu->thread, "edu", edu_fact_thread,
                        edu, QEMU_THREAD_JOINABLE);
 
-    pci_config_set_interrupt_pin(pci_conf, 1);
+    pci_config_set_interrupt_pin(pci_conf, 1); //设置中断pin引脚
 
-    if (msi_init(pdev, 0, 1, true, false, errp)) {
+    if (msi_init(pdev, 0, 1, true, false, errp)) { //PCI配置空间与MSI中断相关的数据
         return;
     }
 
-    memory_region_init_io(&edu->mmio, OBJECT(edu), &edu_mmio_ops, edu,
+    memory_region_init_io(&edu->mmio, OBJECT(edu), &edu_mmio_ops, edu, //为设备创建mmio
                     "edu-mmio", 1 << 20);
-    pci_register_bar(pdev, 0, PCI_BASE_ADDRESS_SPACE_MEMORY, &edu->mmio);
+    pci_register_bar(pdev, 0, PCI_BASE_ADDRESS_SPACE_MEMORY, &edu->mmio); //将该mmio注册为0号bar
 }
 
 static void pci_edu_uninit(PCIDevice *pdev)

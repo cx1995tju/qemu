@@ -131,6 +131,7 @@ static void piix3_write_config_xen(PCIDevice *dev,
 /* return the global irq number corresponding to a given device irq
    pin. We could also use the bus number to have a more precise
    mapping. */
+//通过设备引脚以及设备信息，获取对应的LNK设备, LNK[D|A|B|C]
 static int pci_slot_get_pirq(PCIDevice *pci_dev, int pci_intx)
 {
     int slot_addend;
@@ -270,11 +271,12 @@ static void i440fx_pcihost_get_pci_hole64_end(Object *obj, Visitor *v,
     visit_type_uint64(v, name, &value, errp);
 }
 
+// %i440fx_pcihost_realize
 static void i440fx_pcihost_initfn(Object *obj)
 {
     PCIHostState *s = PCI_HOST_BRIDGE(obj);
 
-    memory_region_init_io(&s->conf_mem, obj, &pci_host_conf_le_ops, s,
+    memory_region_init_io(&s->conf_mem, obj, &pci_host_conf_le_ops, s, //相关io port的读写函数
                           "pci-conf-idx", 4);
     memory_region_init_io(&s->data_mem, obj, &pci_host_data_le_ops, s,
                           "pci-conf-data", 4);
@@ -319,10 +321,11 @@ static void i440fx_realize(PCIDevice *dev, Error **errp)
     }
 }
 
+//i440fx就是北桥(主桥): 其中包含PCI Host bridge
 PCIBus *i440fx_init(const char *host_type, const char *pci_type,
                     PCII440FXState **pi440fx_state,
                     int *piix3_devfn,
-                    ISABus **isa_bus, qemu_irq *pic,
+                    ISABus **isa_bus, qemu_irq *pic, //qemu_irq数组
                     MemoryRegion *address_space_mem,
                     MemoryRegion *address_space_io,
                     ram_addr_t ram_size,
@@ -341,15 +344,16 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
     I440FXState *i440fx; //代表的是主桥对应的设备
 
     //首先创建主桥(北桥)芯片, host_type是其设备类型的名字。pci_type对应主桥在pci根总线上的名字
-    dev = qdev_create(NULL, host_type);
+    dev = qdev_create(NULL, host_type); //主桥挂载在系统总线上
     s = PCI_HOST_BRIDGE(dev);
-    b = pci_bus_new(dev, NULL, pci_address_space, //主桥上创建了一个pci根总线
+    b = pci_bus_new(dev, NULL, pci_address_space, //主桥上创建了一个pci根总线, 其parent就是主桥芯片
                     address_space_io, 0, TYPE_PCI_BUS);
     s->bus = b;
     object_property_add_child(qdev_get_machine(), "i440fx", OBJECT(dev), NULL); //将主桥芯片加入到machine中
-    qdev_init_nofail(dev); //realized(具现化) 主桥芯片， 其realized函数是%i440fx_pcihost_realize
+    qdev_init_nofail(dev); //realized(具现化) 主桥芯片， 其realized函数是%i440fx_pcihost_realize, qdev_create的时候赋值的， refer to: i440fx_pcihost_class_init
 
     //主桥芯片除了连接在系统总线，供根pci bus挂载。同时其也是作为根pci总线的一个设备的角色，这部分就是初始化其作为pci设备的部分。
+    //即为北桥芯片搞了一个pci设备做代表
     d = pci_create_simple(b, 0, pci_type);
     *pi440fx_state = I440FX_PCI_DEVICE(d);
     f = *pi440fx_state;
@@ -403,12 +407,12 @@ PCIBus *i440fx_init(const char *host_type, const char *pci_type,
                 piix3, XEN_PIIX_NUM_PIRQS);
     } else {
         PCIDevice *pci_dev = pci_create_simple_multifunction(b,
-                             -1, true, "PIIX3"); //创建piix3设备, 设置中断路由等信息，参考QEMU主板的架构图，发现IO APIC是连接在南桥piix3设备上
+                             -1, true, "PIIX3"); //创建piix3设备, 设置中断路由等信息，参考QEMU主板的架构图，发现IO APIC是连接在南桥piix3设备上; piix3挂载在pci 根总线，然后isa bus又挂载在南桥上。
         piix3 = PIIX3_PCI_DEVICE(pci_dev);
-        pci_bus_irqs(b, piix3_set_irq, pci_slot_get_pirq, piix3,
+        pci_bus_irqs(b, piix3_set_irq, pci_slot_get_pirq, piix3, //创建pci根总线的路由相关函数
                 PIIX_NUM_PIRQS);
         pci_bus_set_route_irq_fn(b, piix3_route_intx_pin_to_irq);
-    }
+    } //至此 系统总线 pci根总线 isa总线都有了，可以挂载各种其他设备和总线了
     piix3->pic = pic;
     *isa_bus = ISA_BUS(qdev_get_child_bus(DEVICE(piix3), "isa.0"));
 
@@ -457,11 +461,12 @@ static void piix3_set_irq_level_internal(PIIX3State *piix3, int pirq, int level)
     piix3->pic_levels |= mask * !!level;
 }
 
+//pirq是LNK[D|A|B|C]设备号
 static void piix3_set_irq_level(PIIX3State *piix3, int pirq, int level)
 {
     int pic_irq;
 
-    pic_irq = piix3->dev.config[PIIX_PIRQC + pirq];
+    pic_irq = piix3->dev.config[PIIX_PIRQC + pirq]; //将pirq又转换一次，成为pic_irq, 这个就是gsi了, 将LNK[D|A|B|C]设备转换为对应的irq(gsi)号, 后续拿着这个gsi去触发中断吧
     if (pic_irq >= PIIX_NUM_PIC_IRQS) {
         return;
     }
@@ -666,7 +671,7 @@ static void piix3_realize(PCIDevice *dev, Error **errp)
 {
     PIIX3State *d = PIIX3_PCI_DEVICE(dev);
 
-    if (!isa_bus_new(DEVICE(d), get_system_memory(),
+    if (!isa_bus_new(DEVICE(d), get_system_memory(), //创建了一条isa bus挂载在 南桥上
                      pci_address_space_io(dev), errp)) {
         return;
     }

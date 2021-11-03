@@ -129,7 +129,7 @@ static void pci_host_config_write(void *opaque, hwaddr addr,
     if (addr != 0 || len != 4) {
         return;
     }
-    s->config_reg = val;
+    s->config_reg = val; //虚拟机写的值保存在config_reg中
 }
 
 static uint64_t pci_host_config_read(void *opaque, hwaddr addr,

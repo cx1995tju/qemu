@@ -46,7 +46,7 @@ int tap_open(char *ifname, int ifname_size, int *vnet_hdr,
     int len = sizeof(struct virtio_net_hdr);
     unsigned int features;
 
-    TFR(fd = open(PATH_NET_TUN, O_RDWR));
+    TFR(fd = open(PATH_NET_TUN, O_RDWR)); //打开/dev/net/tun 然后找对应的tap设备，有的话就attach上去，没有的话就创建
     if (fd < 0) {
         error_setg_errno(errp, errno, "could not open %s", PATH_NET_TUN);
         return -1;
