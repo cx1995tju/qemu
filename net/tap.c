@@ -129,7 +129,7 @@ static ssize_t tap_receive_iov(NetClientState *nc, const struct iovec *iov,
         iovcnt++;
     }
 
-    return tap_write_packet(s, iovp, iovcnt);
+    return tap_write_packet(s, iovp, iovcnt); //一般通过tap设备丢给内核的bridge，然后通到外网
 }
 
 static ssize_t tap_receive_raw(NetClientState *nc, const uint8_t *buf, size_t size)

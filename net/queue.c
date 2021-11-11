@@ -148,6 +148,9 @@ void qemu_net_queue_append_iov(NetQueue *queue,
     QTAILQ_INSERT_TAIL(&queue->packets, packet, entry);
 }
 
+//filter过滤判断能否发送网卡
+//queue是待接收的队列
+////sender 发包给peer queue
 static ssize_t qemu_net_queue_deliver(NetQueue *queue,
                                       NetClientState *sender,
                                       unsigned flags,
@@ -161,7 +164,7 @@ static ssize_t qemu_net_queue_deliver(NetQueue *queue,
     };
 
     queue->delivering = 1;
-    ret = queue->deliver(sender, flags, &iov, 1, queue->opaque);
+    ret = queue->deliver(sender, flags, &iov, 1, queue->opaque); //创建incomming_queue的时候，提供的回调函数 %qemu_deliver_packet_iov , refer to %qemu_net_client_setup
     queue->delivering = 0;
 
     return ret;
@@ -182,6 +185,9 @@ static ssize_t qemu_net_queue_deliver_iov(NetQueue *queue,
     return ret;
 }
 
+//数据包挂到队列上
+//queue是待接收的队列
+//sender需要将数据发送到peer queue中
 ssize_t qemu_net_queue_send(NetQueue *queue,
                             NetClientState *sender,
                             unsigned flags,
@@ -191,14 +197,14 @@ ssize_t qemu_net_queue_send(NetQueue *queue,
 {
     ssize_t ret;
 
-    if (queue->delivering || !qemu_can_send_packet(sender)) {
+    if (queue->delivering || !qemu_can_send_packet(sender)) { //如果待接收队列正在发包，或者sender不允许发包, 那么将包放到queue的packets链表就可以走了
         qemu_net_queue_append(queue, sender, flags, data, size, sent_cb);
         return 0;
     }
 
-    ret = qemu_net_queue_deliver(queue, sender, flags, data, size);
+    ret = qemu_net_queue_deliver(queue, sender, flags, data, size); //发包
     if (ret == 0) {
-        qemu_net_queue_append(queue, sender, flags, data, size, sent_cb);
+        qemu_net_queue_append(queue, sender, flags, data, size, sent_cb); //包没有发出去，那么也挂到packet 链表上
         return 0;
     }
 

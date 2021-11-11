@@ -517,15 +517,17 @@ inc_tx_bcast_or_mcast_count(E1000State *s, const unsigned char *arr)
     }
 }
 
+//s是表示的前端网卡
+//虚拟机触发网卡的MMIO 或者 PIO后，最后会被qemu将io事件的处理分发到这个函数
 static void
 e1000_send_packet(E1000State *s, const uint8_t *buf, int size)
 {
     static const int PTCregs[6] = { PTC64, PTC127, PTC255, PTC511,
                                     PTC1023, PTC1522 };
 
-    NetClientState *nc = qemu_get_queue(s->nic);
+    NetClientState *nc = qemu_get_queue(s->nic); //获得对应的网卡队列结构，其中的peer还对应了一个后端的网卡队列
     if (s->phy_reg[PHY_CTRL] & MII_CR_LOOPBACK) {
-        nc->info->receive(nc, buf, size);
+        nc->info->receive(nc, buf, size); //如果该网卡是loopback模式，那么直接收包就可以了
     } else {
         qemu_send_packet(nc, buf, size);
     }

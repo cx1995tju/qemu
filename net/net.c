@@ -625,6 +625,7 @@ void qemu_flush_queued_packets(NetClientState *nc)
     qemu_flush_or_purge_queued_packets(nc, false);
 }
 
+//sender需要将数据buf发送出去
 static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
                                                  unsigned flags,
                                                  const uint8_t *buf, int size,
@@ -643,6 +644,7 @@ static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
     }
 
     /* Let filters handle the packet first */
+//filter过滤判断能否发送网卡
     ret = filter_receive(sender, NET_FILTER_DIRECTION_TX,
                          sender, flags, buf, size, sent_cb);
     if (ret) {
@@ -652,10 +654,10 @@ static ssize_t qemu_send_packet_async_with_flags(NetClientState *sender,
     ret = filter_receive(sender->peer, NET_FILTER_DIRECTION_RX,
                          sender, flags, buf, size, sent_cb);
     if (ret) {
-        return ret;
+        return ret; 
     }
 
-    queue = sender->peer->incoming_queue;
+    queue = sender->peer->incoming_queue; //找到 **对端网卡** 的接收队列，数据包挂上去, 找到其应该发送的peer 设备的queue
 
     return qemu_net_queue_send(queue, sender, flags, buf, size, sent_cb);
 }
@@ -668,6 +670,7 @@ ssize_t qemu_send_packet_async(NetClientState *sender,
                                              buf, size, sent_cb);
 }
 
+//发包函数，第一个参数表示网卡的一个队列，可以通过这个结构，索引到其peer，譬如：前端索引到后端设备，后端索引到前端设备
 void qemu_send_packet(NetClientState *nc, const uint8_t *buf, int size)
 {
     qemu_send_packet_async(nc, buf, size, NULL);
@@ -716,7 +719,7 @@ ssize_t qemu_deliver_packet_iov(NetClientState *sender,
                                 int iovcnt,
                                 void *opaque)
 {
-    NetClientState *nc = opaque;
+    NetClientState *nc = opaque; //peer NetClientState
     int ret;
 
     if (nc->link_down) {
@@ -728,7 +731,7 @@ ssize_t qemu_deliver_packet_iov(NetClientState *sender,
     }
 
     if (nc->info->receive_iov && !(flags & QEMU_NET_PACKET_FLAG_RAW)) {
-        ret = nc->info->receive_iov(nc, iov, iovcnt);
+        ret = nc->info->receive_iov(nc, iov, iovcnt); //%具体网卡的接收函数，注意这里是待接收的队列了 %tap_receive_iov
     } else {
         ret = nc_sendv_compat(nc, iov, iovcnt, flags);
     }
