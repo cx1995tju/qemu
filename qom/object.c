@@ -40,6 +40,7 @@ struct InterfaceImpl
     const char *typename;
 };
 
+//类型的实现，是全局per 类型唯一的, refer to %type_table_add
 struct TypeImpl
 {
     const char *name; //类名字
@@ -68,6 +69,7 @@ struct TypeImpl
 	//这些基本信息，也是按照父类的继承关系组织的，参考linux 的sock结构的层次关系。
 	//譬如： PCIDeviceClass
 	//可以认为是保存了一些类的metadata，理解为C++中类的静态成员
+	//每个类型的实现 都会在这是使用first-memeber inherit的机制，包含所有父类的信息的
 
     int num_interfaces;
     InterfaceImpl interfaces[MAX_INTERFACES]; //接口类，就是c++中仅仅包含纯虚函数的抽象类, 或者就是java中的接口
@@ -100,7 +102,7 @@ static TypeImpl *type_table_lookup(const char *name)
     return g_hash_table_lookup(type_table_get(), name);
 }
 
-//使用TypeInfo构造与一个具体的类型, 注意不是构造对象
+//使用TypeInfo构造一个具体的类型, 注意不是构造对象
 static TypeImpl *type_new(const TypeInfo *info)
 {
     TypeImpl *ti = g_malloc0(sizeof(*ti));
@@ -2246,6 +2248,7 @@ static void property_release_alias(Object *obj, const char *name, void *opaque)
     g_free(prop);
 }
 
+//alias属性???
 void object_property_add_alias(Object *obj, const char *name,
                                Object *target_obj, const char *target_name,
                                Error **errp)

@@ -59,7 +59,7 @@ void virtio_bus_device_plugged(VirtIODevice *vdev, Error **errp)
                                             errp);
 
     if (klass->device_plugged != NULL) {
-        klass->device_plugged(qbus->parent, errp);
+        klass->device_plugged(qbus->parent, errp); //virtio_pci_device_plugged
     }
 }
 

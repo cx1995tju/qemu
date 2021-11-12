@@ -1965,7 +1965,7 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
     }
 
     bus = PCI_BUS(qdev_get_parent_bus(qdev));
-    pci_dev = do_pci_register_device(pci_dev, bus,
+    pci_dev = do_pci_register_device(pci_dev, bus, //注册到总线
                                      object_get_typename(OBJECT(qdev)),
                                      pci_dev->devfn, errp);
     if (pci_dev == NULL)
@@ -2502,7 +2502,7 @@ static void pci_device_class_init(ObjectClass *klass, void *data)
     DeviceClass *k = DEVICE_CLASS(klass);
     PCIDeviceClass *pc = PCI_DEVICE_CLASS(klass);
 
-    k->realize = pci_qdev_realize;
+    k->realize = pci_qdev_realize; //修改了其父class 的realize函数的
     k->unrealize = pci_qdev_unrealize;
     k->bus_type = TYPE_PCI_BUS; //所有PCI设备挂载的总线类型必然是PCI总线咯，所以这部分信息可以放置在DviceClass中
     k->props = pci_props;

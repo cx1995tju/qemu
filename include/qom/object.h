@@ -367,7 +367,8 @@ typedef void (ObjectFree)(void *obj);
  * The base for all classes.  The only thing that #ObjectClass contains is an
  * integer type handle.
  */
-//类似于C++类的静态成员
+//类似于C++类的静态成员, 类的静态成员之间，也构成同样的继承关系的
+//譬如：DeviceClass -> PCIDeviceClass -> VirtioPCIClass
 struct ObjectClass
 {
     /*< private >*/

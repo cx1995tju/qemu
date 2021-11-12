@@ -235,7 +235,7 @@ struct VirtIOBlkPCI {
 
 struct VirtIOBalloonPCI {
     VirtIOPCIProxy parent_obj;
-    VirtIOBalloon vdev;
+    VirtIOBalloon vdev; //表示其代理的设备
 };
 
 /*

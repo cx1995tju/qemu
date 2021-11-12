@@ -1293,13 +1293,15 @@ void virtio_queue_set_vector(VirtIODevice *vdev, int n, uint16_t vector)
     }
 }
 
+//vdev设备添加一个大小为queue_size的queue, 其handler是handle_ouput
+//虚拟机的io请求，最后会调用到这里的
 VirtQueue *virtio_add_queue(VirtIODevice *vdev, int queue_size,
                             VirtIOHandleOutput handle_output)
 {
     int i;
 
     for (i = 0; i < VIRTIO_QUEUE_MAX; i++) {
-        if (vdev->vq[i].vring.num == 0)
+        if (vdev->vq[i].vring.num == 0) //找到一个这个设备上还没有被使用的queue
             break;
     }
 
@@ -1910,6 +1912,8 @@ static void virtio_vmstate_change(void *opaque, int running, RunState state)
     }
 }
 
+//第二个参数不是代理设备，而是virtio设备的
+//显然这里初始化工作做的不多的，更多的工作是virtio realize的时候做的, 譬如: virtio_balloon_pci_class_init / virtio_balloon_pci_realize
 void virtio_instance_init_common(Object *proxy_obj, void *data,
                                  size_t vdev_size, const char *vdev_name)
 {
@@ -1921,6 +1925,7 @@ void virtio_instance_init_common(Object *proxy_obj, void *data,
     qdev_alias_all_properties(vdev, proxy_obj);
 }
 
+//virtio 设备初始化的公共部分
 void virtio_init(VirtIODevice *vdev, const char *name,
                  uint16_t device_id, size_t config_size)
 {
@@ -1942,7 +1947,7 @@ void virtio_init(VirtIODevice *vdev, const char *name,
     vdev->vq = g_malloc0(sizeof(VirtQueue) * VIRTIO_QUEUE_MAX);
     vdev->vm_running = runstate_is_running();
     vdev->broken = false;
-    for (i = 0; i < VIRTIO_QUEUE_MAX; i++) {
+    for (i = 0; i < VIRTIO_QUEUE_MAX; i++) { //分配了足够的queue并初始化
         vdev->vq[i].vector = VIRTIO_NO_VECTOR;
         vdev->vq[i].vdev = vdev;
         vdev->vq[i].queue_index = i;
@@ -2117,7 +2122,7 @@ static void virtio_device_realize(DeviceState *dev, Error **errp)
     assert(!vdc->vmsd || !vdc->load);
 
     if (vdc->realize != NULL) {
-        vdc->realize(dev, &err);
+        vdc->realize(dev, &err); //% virtio_balloon_device_realize  %virtio_net_device_realize
         if (err != NULL) {
             error_propagate(errp, err);
             return;
