@@ -69,38 +69,39 @@ typedef struct VRing
     hwaddr used;
 } VRing;
 
+//对比linux: struct vring_virtqueue
 struct VirtQueue
 {
-    VRing vring;
+    VRing vring; //保存virtio spec 描述的结构split queue
 
     /* Next head to pop */
-    uint16_t last_avail_idx;
+    uint16_t last_avail_idx; //写一次取avail 的index
 
     /* Last avail_idx read from VQ. */
     uint16_t shadow_avail_idx;
 
-    uint16_t used_idx;
+    uint16_t used_idx; //即将使用的used ring的idx
 
     /* Last used index value we have signalled on */
-    uint16_t signalled_used;
+    uint16_t signalled_used; //上一次通知驱动的时候的used值
 
     /* Last used index value we have signalled on */
-    bool signalled_used_valid;
+    bool signalled_used_valid; //表示signalled_used是否有效
 
     /* Notification enabled? */
-    bool notification;
+    bool notification; //是否需要通知驱动端
 
-    uint16_t queue_index;
+    uint16_t queue_index; //队列索引
 
-    unsigned int inuse;
+    unsigned int inuse; //队列中正在处理的请求个数
 
-    uint16_t vector;
-    VirtIOHandleOutput handle_output;
-    VirtIOHandleOutput handle_aio_output;
-    VirtIODevice *vdev;
-    EventNotifier guest_notifier;
+    uint16_t vector; //如果使用MSI-X中断，该队列使用的vector 号
+    VirtIOHandleOutput handle_output; //具体设备用来处理驱动端请求的回调函数
+    VirtIOHandleOutput handle_aio_output; //与上类似，但是是异步的
+    VirtIODevice *vdev; //指向对应的virtio设备
+    EventNotifier guest_notifier; //与irqfd 和 eventfd相关
     EventNotifier host_notifier;
-    QLIST_ENTRY(VirtQueue) node;
+    QLIST_ENTRY(VirtQueue) node; //同一个设备的queue都链接在一起
 };
 
 /* virt queue functions */
@@ -356,6 +357,7 @@ void virtqueue_flush(VirtQueue *vq, unsigned int count)
         vq->signalled_used_valid = false;
 }
 
+//将elem描述的used desc的信息，push到vq的used ring中
 void virtqueue_push(VirtQueue *vq, const VirtQueueElement *elem,
                     unsigned int len)
 {
@@ -699,7 +701,7 @@ void *virtqueue_pop(VirtQueue *vq, size_t sz)
         bool map_ok;
 
         if (desc.flags & VRING_DESC_F_WRITE) {
-            map_ok = virtqueue_map_desc(vdev, &in_num, addr + out_num,
+            map_ok = virtqueue_map_desc(vdev, &in_num, addr + out_num, //这里需要将desc中的GPA 映射为HVA
                                         iov + out_num,
                                         VIRTQUEUE_MAX_SIZE - out_num, true,
                                         desc.addr, desc.len);
@@ -730,7 +732,7 @@ void *virtqueue_pop(VirtQueue *vq, size_t sz)
     }
 
     /* Now copy what we have collected and mapped */
-    elem = virtqueue_alloc_element(sz, out_num, in_num);
+    elem = virtqueue_alloc_element(sz, out_num, in_num); //该结构用于保存得到的数据的信息，注意，不是保存数据本身哦. 这里根据sz分配该结构大小，因为该结构可能基于first-member inherit 的方式做了扩充的
     elem->index = head;
     for (i = 0; i < out_num; i++) {
         elem->out_addr[i] = addr[i];
@@ -1389,6 +1391,7 @@ void virtio_notify_irqfd(VirtIODevice *vdev, VirtQueue *vq)
     event_notifier_set(&vq->guest_notifier);
 }
 
+//通知前端驱动, 前端就会收到重的，在内核里驱动加载的时候，申请的中断处理函数是 %vp_interrupt
 void virtio_notify(VirtIODevice *vdev, VirtQueue *vq)
 {
     if (!virtio_should_notify(vdev, vq)) {

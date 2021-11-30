@@ -41,7 +41,7 @@ typedef struct VirtQueue VirtQueue;
 
 #define VIRTQUEUE_MAX_SIZE 1024
 
-typedef struct VirtQueueElement
+typedef struct VirtQueueElement //用来记录从avail queue中获取的数据的信息，不是数据本身哦, 可以在该结构的基础上以first member inherit的方式做扩充, refer to virtqueue_pop
 {
     unsigned int index;
     unsigned int out_num;
