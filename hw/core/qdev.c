@@ -357,7 +357,7 @@ void qdev_init_nofail(DeviceState *dev)
     assert(!dev->realized);
 
     object_ref(OBJECT(dev));
-    object_property_set_bool(OBJECT(dev), true, "realized", &err);
+    object_property_set_bool(OBJECT(dev), true, "realized", &err); //refer to device_set_realized
     if (err) {
         error_reportf_err(err, "Initialization of device %s failed: ",
                           object_get_typename(OBJECT(dev)));
@@ -917,7 +917,7 @@ static void device_set_realized(Object *obj, bool value, Error **errp)
         }
 
         if (dc->realize) {
-            dc->realize(dev, &local_err);
+            dc->realize(dev, &local_err); //%pci_qdev_realize
         }
 
         if (local_err != NULL) {
@@ -941,7 +941,7 @@ static void device_set_realized(Object *obj, bool value, Error **errp)
         }
 
         QLIST_FOREACH(bus, &dev->child_bus, sibling) {
-            object_property_set_bool(OBJECT(bus), true, "realized",
+            object_property_set_bool(OBJECT(bus), true, "realized", //先设置好子设备的的realize属性
                                          &local_err);
             if (local_err != NULL) {
                 goto child_realize_fail;

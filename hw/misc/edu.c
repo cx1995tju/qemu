@@ -222,6 +222,8 @@ static uint64_t edu_mmio_read(void *opaque, hwaddr addr, unsigned size)
     return val;
 }
 
+//对edu设备的操作，最后会vm-exit都kvm，kvm分发给qemu，qemu根据vm-exit的地址找到MR，进而找到该回调函数，通过opaque参数，就可以找到对应的设备了
+//该函数展示了一个典型的设备模拟函数
 static void edu_mmio_write(void *opaque, hwaddr addr, uint64_t val,
                 unsigned size)
 {
@@ -259,14 +261,14 @@ static void edu_mmio_write(void *opaque, hwaddr addr, uint64_t val,
             atomic_and(&edu->status, ~EDU_STATUS_IRQFACT);
         }
         break;
-    case 0x60:
+    case 0x60: //如果虚拟机CPU写这个寄存器，那么就会拉高irq的电平
         edu_raise_irq(edu, val);
         break;
     case 0x64:
         edu_lower_irq(edu, val);
         break;
     case 0x80:
-        dma_rw(edu, true, &val, &edu->dma.src, false);
+        dma_rw(edu, true, &val, &edu->dma.src, false); //可能是让设备做dma，读写虚拟机的地址空间
         break;
     case 0x88:
         dma_rw(edu, true, &val, &edu->dma.dst, false);
@@ -356,7 +358,7 @@ static void pci_edu_realize(PCIDevice *pdev, Error **errp)
         return;
     }
 
-    memory_region_init_io(&edu->mmio, OBJECT(edu), &edu_mmio_ops, edu, //为设备创建mmio
+    memory_region_init_io(&edu->mmio, OBJECT(edu), &edu_mmio_ops, edu, //为设备创建mmio， 这个回调函数，及其重要
                     "edu-mmio", 1 << 20);
     pci_register_bar(pdev, 0, PCI_BASE_ADDRESS_SPACE_MEMORY, &edu->mmio); //将该mmio注册为0号bar
 }

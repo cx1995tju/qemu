@@ -23,10 +23,11 @@
 #include "hw/xen/xen.h"
 
 //表示虚拟机的一块内存条
+//ram_list.blocks
 struct RAMBlock {
     struct rcu_head rcu;
     struct MemoryRegion *mr; //所属memoryregion
-    uint8_t *host; //虚拟机物理内存在QEMU进程中对应的虚拟内存
+    uint8_t *host; //虚拟机物理内存在QEMU进程中对应的虚拟内存, 这个地址来自于mmap，可能是匿名页，也可能是huge page 的文件
     ram_addr_t offset; //该内存条在虚拟机整个内存中的偏移
     ram_addr_t used_length;
     ram_addr_t max_length;

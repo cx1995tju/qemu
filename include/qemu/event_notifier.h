@@ -23,7 +23,7 @@ struct EventNotifier {
 #ifdef _WIN32
     HANDLE event;
 #else
-    int rfd;
+    int rfd; //支持eventfd的时候，这两个fd是一样的；如果不支持的话就会使用pipe来模拟, 一个用于写，一个用于读
     int wfd;
 #endif
 };

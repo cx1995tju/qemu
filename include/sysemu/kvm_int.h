@@ -15,9 +15,9 @@
 
 typedef struct KVMSlot
 {
-    hwaddr start_addr;
+    hwaddr start_addr; //GPA , refer to kvm_set_phys_mem
     ram_addr_t memory_size;
-    void *ram;
+    void *ram; //HVA
     int slot;
     int flags;
 } KVMSlot;

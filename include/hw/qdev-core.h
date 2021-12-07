@@ -189,6 +189,7 @@ struct DeviceListener {
 #define BUS_CLASS(klass) OBJECT_CLASS_CHECK(BusClass, (klass), TYPE_BUS)
 #define BUS_GET_CLASS(obj) OBJECT_GET_CLASS(BusClass, (obj), TYPE_BUS)
 
+//refer to BusState
 struct BusClass {
     ObjectClass parent_class;
 

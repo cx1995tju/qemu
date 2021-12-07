@@ -38,9 +38,11 @@ static bool memory_region_update_pending;
 static bool ioeventfd_update_pending;
 static bool global_dirty_log = false;
 
+//所有的MemoryListener 链接在这里
 static QTAILQ_HEAD(memory_listeners, MemoryListener) memory_listeners
     = QTAILQ_HEAD_INITIALIZER(memory_listeners);
 
+//所有的AddressSpace 都链接到这里
 static QTAILQ_HEAD(, AddressSpace) address_spaces
     = QTAILQ_HEAD_INITIALIZER(address_spaces);
 
@@ -889,7 +891,7 @@ static void address_space_update_topology_pass(AddressSpace *as,
 static void address_space_update_topology(AddressSpace *as)
 {
     FlatView *old_view = address_space_get_flatview(as);
-    FlatView *new_view = generate_memory_topology(as->root);
+    FlatView *new_view = generate_memory_topology(as->root); //平坦化，才可以注册到KVM内部
 
     address_space_update_topology_pass(as, old_view, new_view, false);
     address_space_update_topology_pass(as, old_view, new_view, true);
@@ -932,11 +934,11 @@ void memory_region_transaction_commit(void)
             MEMORY_LISTENER_CALL_GLOBAL(begin, Forward); //这个宏调用每个memory listener的begin操作，各个listener可以做一些初始化工作
 
             QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
-                address_space_update_topology(as); //更新addressspace的内存视图, 这个过程可能会调用 add del等回调函数
+                address_space_update_topology(as); //更新addressspace的内存视图, 这个过程可能会调用 add del等回调函数 %kvm_region_add
             }
 
             MEMORY_LISTENER_CALL_GLOBAL(commit, Forward); //最后调用memory listeners的commit回调函数
-        } else if (ioeventfd_update_pending) {
+        } else if (ioeventfd_update_pending) { //这里是与ioeventfd关联的内存被更新了
             QTAILQ_FOREACH(as, &address_spaces, address_spaces_link) {
                 address_space_update_ioeventfds(as);
             }
@@ -1000,7 +1002,7 @@ void memory_region_init(MemoryRegion *mr,
     }
     mr->name = g_strdup(name);
     mr->owner = owner;
-    mr->ram_block = NULL;
+    mr->ram_block = NULL; //此时还没有ram_block
 
     if (name) {
         char *escaped_name = memory_region_escape_name(name);
@@ -1357,7 +1359,7 @@ void memory_region_init_io(MemoryRegion *mr,
 {
     memory_region_init(mr, owner, name, size);
     mr->ops = ops ? ops : &unassigned_mem_ops;
-    mr->opaque = opaque;
+    mr->opaque = opaque; //关键中的关键，是建立memory region与某个具体结构的关系关键，譬如：表示某个具体的设备结构
     mr->terminates = true;
 }
 
@@ -1371,7 +1373,7 @@ void memory_region_init_ram(MemoryRegion *mr,
     mr->ram = true; //这里都是true
     mr->terminates = true;
     mr->destructor = memory_region_destructor_ram;
-    mr->ram_block = qemu_ram_alloc(size, mr, errp); //实际工作
+    mr->ram_block = qemu_ram_alloc(size, mr, errp); //实际工作 , 分配了ram_block, 但是ram_blokc的host地址还是空的, 即还没有从qemu虚拟地址空间分配的, 可能在phys_mem_alloc qemu_anon_ram_alloc中分配
     mr->dirty_log_mask = tcg_enabled() ? (1 << DIRTY_MEMORY_CODE) : 0;
 }
 
@@ -1951,12 +1953,12 @@ void memory_region_clear_global_locking(MemoryRegion *mr)
 
 static bool userspace_eventfd_warning;
 
-void memory_region_add_eventfd(MemoryRegion *mr,
-                               hwaddr addr,
-                               unsigned size,
-                               bool match_data,
+void memory_region_add_eventfd(MemoryRegion *mr, //该io地址所在的memory region
+                               hwaddr addr, //io地址
+                               unsigned size, //io大小
+                               bool match_data, //表示虚拟机向addr写入的值是否要与data完全一致，如果为true的话，只有一致才会走eventfd，否则还是走普通的io分发路径
                                uint64_t data,
-                               EventNotifier *e)
+                               EventNotifier *e) //eventfd
 {
     MemoryRegionIoeventfd mrfd = {
         .addr.start = int128_make64(addr),
@@ -2033,10 +2035,10 @@ static void memory_region_update_container_subregions(MemoryRegion *subregion)
     MemoryRegion *mr = subregion->container;
     MemoryRegion *other;
 
-    memory_region_transaction_begin();
+    memory_region_transaction_begin(); //可能需要通知到kvm
 
     memory_region_ref(subregion);
-    QTAILQ_FOREACH(other, &mr->subregions, subregions_link) {
+    QTAILQ_FOREACH(other, &mr->subregions, subregions_link) { //根据优先级顺序排序？？？？
         if (subregion->priority >= other->priority) {
             QTAILQ_INSERT_BEFORE(other, subregion, subregions_link);
             goto done;
@@ -2045,9 +2047,10 @@ static void memory_region_update_container_subregions(MemoryRegion *subregion)
     QTAILQ_INSERT_TAIL(&mr->subregions, subregion, subregions_link);
 done:
     memory_region_update_pending |= mr->enabled && subregion->enabled;
-    memory_region_transaction_commit();
+    memory_region_transaction_commit(); //MR发生变化了，要通知KVM的
 }
 
+//将subregion加入到mr 的offset处
 static void memory_region_add_subregion_common(MemoryRegion *mr,
                                                hwaddr offset,
                                                MemoryRegion *subregion)
@@ -2342,7 +2345,7 @@ void memory_listener_register(MemoryListener *listener, AddressSpace *as)
     MemoryListener *other = NULL;
 
     listener->address_space = as;
-    if (QTAILQ_EMPTY(&memory_listeners)
+    if (QTAILQ_EMPTY(&memory_listeners) //插入全局链表
         || listener->priority >= QTAILQ_LAST(&memory_listeners,
                                              memory_listeners)->priority) {
         QTAILQ_INSERT_TAIL(&memory_listeners, listener, link);
@@ -2355,7 +2358,7 @@ void memory_listener_register(MemoryListener *listener, AddressSpace *as)
         QTAILQ_INSERT_BEFORE(other, listener, link);
     }
 
-    if (QTAILQ_EMPTY(&as->listeners)
+    if (QTAILQ_EMPTY(&as->listeners) //链接到address space
         || listener->priority >= QTAILQ_LAST(&as->listeners,
                                              memory_listeners)->priority) {
         QTAILQ_INSERT_TAIL(&as->listeners, listener, link_as);
@@ -2368,7 +2371,7 @@ void memory_listener_register(MemoryListener *listener, AddressSpace *as)
         QTAILQ_INSERT_BEFORE(other, listener, link_as);
     }
 
-    listener_add_address_space(listener, as);
+    listener_add_address_space(listener, as); //这个address space发生变化了，当然需要去调用注册的memory 的回调函数
 }
 
 void memory_listener_unregister(MemoryListener *listener)

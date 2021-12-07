@@ -46,7 +46,7 @@
 #include "net/vhost_net.h"
 
 typedef struct TAPState {
-    NetClientState nc;
+    NetClientState nc;//tap设备不支持多队列吧，所以只有一个NetClientState结构
     int fd;
     char down_script[1024];
     char down_script_arg[128];

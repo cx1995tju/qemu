@@ -59,7 +59,7 @@ void *qemu_ram_mmap(int fd, size_t size, size_t align, bool shared)
     int flags = anonfd == -1 ? MAP_ANONYMOUS : MAP_NORESERVE;
     void *ptr = mmap(0, total, PROT_NONE, flags | MAP_PRIVATE, anonfd, 0);
 #else
-    void *ptr = mmap(0, total, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    void *ptr = mmap(0, total, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0); //从匿名页分配
 #endif
     size_t offset = QEMU_ALIGN_UP((uintptr_t)ptr, align) - (uintptr_t)ptr;
     void *ptr1;

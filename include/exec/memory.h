@@ -183,6 +183,13 @@ struct MemoryRegionIOMMUOps {
 typedef struct CoalescedMemoryRange CoalescedMemoryRange;
 typedef struct MemoryRegionIoeventfd MemoryRegionIoeventfd;
 
+/* 常见MR种类 */
+/* 1. RAM */
+/* 2. MMIO */
+/* 3. ROM */
+/* 4. ROM device */
+/* 5. container */
+/* 6. alias */
 struct MemoryRegion {
     Object parent_obj;
 
@@ -197,13 +204,13 @@ struct MemoryRegion {
     bool flush_coalesced_mmio;
     bool global_locking;
     uint8_t dirty_log_mask;
-    RAMBlock *ram_block; //表示实际分配的物理内存
+    RAMBlock *ram_block; //记录实际分配的HVA
     Object *owner;
     const MemoryRegionIOMMUOps *iommu_ops;
 
     const MemoryRegionOps *ops; //一组回调函数，在对MemoryRegion操作的时候会被调用，譬如：MMIO的读写请求
-    void *opaque;
-    MemoryRegion *container; //表示其上一级的MemoryRegion
+    void *opaque; //譬如，可以设置为一个具体的设备结构，是ops中函数的调用参数，这样就可以根据memory region找到设备了
+    MemoryRegion *container; //表示其上一级的MemoryRegion, 即其属于哪一个container, 参考%memory_region_add_subregion_common
     Int128 size;
     hwaddr addr; //该MemoryRegion所在的 **虚拟机上的物理地址**
     void (*destructor)(MemoryRegion *mr);
@@ -220,19 +227,21 @@ struct MemoryRegion {
     QTAILQ_ENTRY(MemoryRegion) subregions_link;  //连接同一个父节点下的兄弟节点
     QTAILQ_HEAD(coalesced_ranges, CoalescedMemoryRange) coalesced;
     const char *name;
-    unsigned ioeventfd_nb;
-    MemoryRegionIoeventfd *ioeventfds;
+    unsigned ioeventfd_nb; //ioeventfd的数目
+    MemoryRegionIoeventfd *ioeventfds; //按照地址从小到大的顺序保存了所有注册的ioeventfd
     QLIST_HEAD(, IOMMUNotifier) iommu_notify;
     IOMMUNotifierFlag iommu_notify_flags;
 };
 
 /**
- * MemoryListener: callbacks structure for updates to the physical memory map
+ * MemoryListener: callbacks structure for updates to the physical memory map, 仅针对物理内存这个特殊的addressspace的？？？
  *
  * Allows a component to adjust to changes in the guest-visible memory map.
  * Use with memory_listener_register() and memory_listener_unregister().
  */
 //注册函数 memory_listener_register
+//%kvm_io_listener
+//%kvm_region_add
 struct MemoryListener {
     void (*begin)(MemoryListener *listener);
     void (*commit)(MemoryListener *listener); //执行内存变更时执行的函数
@@ -258,13 +267,15 @@ struct MemoryListener {
     unsigned priority; //表示优先级，优先级低的先被调用，删除的时候后被删除
     AddressSpace *address_space;
     QTAILQ_ENTRY(MemoryListener) link; //链接到全局变量memory_listeners
-    QTAILQ_ENTRY(MemoryListener) link_as; //同一个地址空间的memory listener通过这个也链接到一起
+    QTAILQ_ENTRY(MemoryListener) link_as; //同一个地址空间的memory listener通过这个也链接到一起, 链接到AddressSpace中
 };
 
 /**
  * AddressSpace: describes a mapping of addresses to #MemoryRegion objects
  */
 //所有的AddressSpace通过address_spaces_link 节点连接起来
+//表示某个视角下的一个地址空间, 是一个非常非常顶层的概念
+//常用的AddressSpace有，address_space_memory 表示系统内存空间, address_space_io x86系统下的IO地址空间， cpu-memory-x CPUx看到的地址空间，一般与address_space_memory 一致
 struct AddressSpace {
     /* All fields are private. */
     struct rcu_head rcu;
@@ -281,7 +292,7 @@ struct AddressSpace {
     struct AddressSpaceDispatch *dispatch;
     struct AddressSpaceDispatch *next_dispatch;
     MemoryListener dispatch_listener;
-    QTAILQ_HEAD(memory_listeners_as, MemoryListener) listeners; //QEMU的其他子系统可以注册内存事件的变更事件的回调函数，就挂载在这里, 所有同一个地址的都链接在这里
+    QTAILQ_HEAD(memory_listeners_as, MemoryListener) listeners; //QEMU的其他子系统可以注册内存事件的变更事件的回调函数，就挂载在这里, 所有同一个地址的都链接在这里 %kvm_io_listener, 参考MemoryListener 的link_as成员
     QTAILQ_ENTRY(AddressSpace) address_spaces_link;
 };
 

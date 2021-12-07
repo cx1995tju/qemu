@@ -1361,7 +1361,7 @@ void xen_load_linux(PCMachineState *pcms)
     pcms->fw_cfg = fw_cfg;
 }
 
-//主要用于分配虚拟机的物理内存以及初始化相应的memoryRegion和rom，并将相应数据添加到fw_cfg设备中
+//主要用于分配虚拟机的物理内存以及 **初始化相应** 的memoryRegion和rom，并将相应数据添加到fw_cfg设备中
 void pc_memory_init(PCMachineState *pcms,
                     MemoryRegion *system_memory,
                     MemoryRegion *rom_memory,
@@ -1460,7 +1460,7 @@ void pc_memory_init(PCMachineState *pcms,
                            &error_fatal);
     vmstate_register_ram_global(option_rom_mr);
     memory_region_add_subregion_overlap(rom_memory,
-                                        PC_ROM_MIN_VGA,
+                                        PC_ROM_MIN_VGA, //添加VGA空间到ROM MR中
                                         option_rom_mr,
                                         1);
 

@@ -1738,7 +1738,7 @@ RAMBlock *qemu_ram_alloc_internal(ram_addr_t size, ram_addr_t max_size,
     assert(max_size >= size);
     new_block->fd = -1;
     new_block->page_size = getpagesize();
-    new_block->host = host;
+    new_block->host = host; //此时可能还是NULL, 真实的虚拟地址分配可能在qemu_anon_ram_alloc, 还要强调的是，这里是分配匿名页，内核还是没有给真正的内存的
     if (host) {
         new_block->flags |= RAM_PREALLOC;
     }
@@ -1760,6 +1760,7 @@ RAMBlock *qemu_ram_alloc_from_ptr(ram_addr_t size, void *host,
     return qemu_ram_alloc_internal(size, size, NULL, host, false, mr, errp);
 }
 
+//这里是没有分配虚拟空间的
 RAMBlock *qemu_ram_alloc(ram_addr_t size, MemoryRegion *mr, Error **errp)
 {
     return qemu_ram_alloc_internal(size, size, NULL, NULL, false, mr, errp);
@@ -2443,6 +2444,7 @@ void address_space_destroy_dispatch(AddressSpace *as)
 //创建两个address_space, 一个表示真个系统内存地址空间，一个表示IO地址空间
 //前者根memoryregion是system_memory, 后者根memroyregion是system_io；
 //这两者都是全局变量
+//但是都还没有初始化的
 static void memory_map_init(void)
 {
     system_memory = g_malloc(sizeof(*system_memory));

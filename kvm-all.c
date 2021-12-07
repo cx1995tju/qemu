@@ -232,6 +232,7 @@ int kvm_physical_memory_addr_from_host(KVMState *s, void *ram,
     return 0;
 }
 
+//转换为内核kvm模块可以使用的结构
 static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot)
 {
     KVMState *s = kvm_state;
@@ -697,11 +698,11 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
                              MemoryRegionSection *section, bool add)
 {
     KVMState *s = kvm_state;
-    KVMSlot *mem, old;
+    KVMSlot *mem, old; //核心是构造该结构
     int err;
     MemoryRegion *mr = section->mr;
     bool writeable = !mr->readonly && !mr->rom_device;
-    hwaddr start_addr = section->offset_within_address_space;
+    hwaddr start_addr = section->offset_within_address_space; //设置为该section在address space中的偏移，这个address_space 应该就是address_sapce_system 故这个偏移就是物理内存地址
     ram_addr_t size = int128_get64(section->size);
     void *ram = NULL;
     unsigned delta;
@@ -721,7 +722,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
         return;
     }
 
-    if (!memory_region_is_ram(mr)) {
+    if (!memory_region_is_ram(mr)) { //如果不是表示ram的 mr的话。不会提交到内核的KVM的
         if (writeable || !kvm_readonly_mem_allowed) {
             return;
         } else if (!mr->romd_mode) {
@@ -731,7 +732,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
         }
     }
 
-    ram = memory_region_get_ram_ptr(mr) + section->offset_within_region + delta;
+    ram = memory_region_get_ram_ptr(mr) + section->offset_within_region + delta; //对应的qemu的虚拟地址
 
     while (1) {
         mem = kvm_lookup_overlapping_slot(kml, start_addr, start_addr + size);
@@ -965,7 +966,7 @@ void kvm_memory_listener_register(KVMState *s, KVMMemoryListener *kml,
         kml->slots[i].slot = i; //该结构表示KVM内存slot，即对于KVM来说，虚拟机有多少段内存
     }
 
-    kml->listener.region_add = kvm_region_add; //初始化各种回调函数
+    kml->listener.region_add = kvm_region_add; //初始化各种回调函数, 然后注册到address space了 %address_space_memory, 该as表示系统内存
     kml->listener.region_del = kvm_region_del;
     kml->listener.log_start = kvm_log_start;
     kml->listener.log_stop = kvm_log_stop;

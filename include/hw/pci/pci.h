@@ -285,7 +285,7 @@ struct PCIDevice {
     MemoryRegion bus_master_enable_region;
 
     /* do not access the following fields */
-    PCIConfigReadFunc *config_read;
+    PCIConfigReadFunc *config_read; //该设备的config 读写函数
     PCIConfigWriteFunc *config_write;
 
     /* Legacy PCI VGA regions */

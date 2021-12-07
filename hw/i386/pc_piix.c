@@ -120,7 +120,7 @@ static void pc_init1(MachineState *machine,
     if (xen_enabled()) {
         xen_hvm_init(pcms, &ram_memory);
     } else {
-        if (!pcms->max_ram_below_4g) {
+        if (!pcms->max_ram_below_4g) { //设置高低内存的分界线
             pcms->max_ram_below_4g = 0xe0000000; /* default: 3.5G */
         }
         lowmem = pcms->max_ram_below_4g;
@@ -156,7 +156,7 @@ static void pc_init1(MachineState *machine,
     if (pcmc->pci_enabled) {
         pci_memory = g_new(MemoryRegion, 1);
         memory_region_init(pci_memory, NULL, "pci", UINT64_MAX);
-        rom_memory = pci_memory;
+        rom_memory = pci_memory; //cpi视角下的地址空间
     } else {
         pci_memory = NULL;
         rom_memory = system_memory;
@@ -174,6 +174,7 @@ static void pc_init1(MachineState *machine,
     }
 
     /* allocate ram and load rom/bios */
+    //在memory_map_init, 分配了相关结构
     if (!xen_enabled()) {
         pc_memory_init(pcms, system_memory,
                        rom_memory, &ram_memory);
@@ -239,7 +240,7 @@ static void pc_init1(MachineState *machine,
     pc_basic_device_init(isa_bus, pcms->gsi, &rtc_state, true,
                          (pcms->vmport != ON_OFF_AUTO_ON), 0x4);
 
-    pc_nic_init(isa_bus, pci_bus); //nic初始化, 关于nic的参数解析都已经结束了 `-net`参数
+    pc_nic_init(isa_bus, pci_bus); //nic初始化, 关于nic的参数解析都已经结束了 `-net`参数  refer to net_init_clients
 
     ide_drive_get(hd, ARRAY_SIZE(hd)); //ide控制器
     if (pcmc->pci_enabled) {

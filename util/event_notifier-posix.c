@@ -39,7 +39,7 @@ int event_notifier_init(EventNotifier *e, int active)
     int ret;
 
 #ifdef CONFIG_EVENTFD
-    ret = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+    ret = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC); //注意，初始counter是0，是不可读状态
 #else
     ret = -1;
     errno = ENOSYS;

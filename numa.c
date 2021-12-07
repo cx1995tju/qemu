@@ -435,6 +435,8 @@ static void allocate_system_memory_nonnuma(MemoryRegion *mr, Object *owner,
     vmstate_register_ram_global(mr);
 }
 
+//mr仅仅是表示内存的结构，具体的分配工作是该函数做的，将结果保存到mr中
+//qemu_ram_alloc -> mmap
 void memory_region_allocate_system_memory(MemoryRegion *mr, Object *owner,
                                           const char *name,
                                           uint64_t ram_size)

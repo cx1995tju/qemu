@@ -1107,7 +1107,7 @@ int net_client_init(QemuOpts *opts, bool is_netdev, Error **errp)
         }
     }
 
-    if (is_netdev) { //netdev的解析
+    if (is_netdev) { //netdev的解析, 解析后拿到一个object
         visit_type_Netdev(v, NULL, (Netdev **)&object, &err);
     } else { //非netdev的解析
         visit_type_NetLegacy(v, NULL, (NetLegacy **)&object, &err);

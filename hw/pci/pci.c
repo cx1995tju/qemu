@@ -1038,7 +1038,7 @@ static PCIDevice *do_pci_register_device(PCIDevice *pci_dev, PCIBus *bus,
         config_read = pci_default_read_config;
     if (!config_write)
         config_write = pci_default_write_config;
-    pci_dev->config_read = config_read;
+    pci_dev->config_read = config_read; //保存到pci_dev设备
     pci_dev->config_write = config_write;
     bus->devices[devfn] = pci_dev; //复制到bus->devices数组保存
     pci_dev->version_id = 2; /* Current pci device vmstate version */
@@ -1097,7 +1097,7 @@ void pci_register_bar(PCIDevice *pci_dev, int region_num,
     r->size = size;
     r->type = type;
     r->memory = memory;
-    r->address_space = type & PCI_BASE_ADDRESS_SPACE_IO
+    r->address_space = type & PCI_BASE_ADDRESS_SPACE_IO //极其重要
                         ? pci_dev->bus->address_space_io
                         : pci_dev->bus->address_space_mem;
 
@@ -1951,6 +1951,8 @@ PCIDevice *pci_find_device(PCIBus *bus, int bus_num, uint8_t devfn)
     return bus->devices[devfn];
 }
 
+//refer to pci_device_class_init
+//qdev_init_nofail -> device_set_realized ->  pci_qdev_realize
 static void pci_qdev_realize(DeviceState *qdev, Error **errp)
 {
     PCIDevice *pci_dev = (PCIDevice *)qdev;
@@ -1971,7 +1973,7 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
     if (pci_dev == NULL)
         return;
 
-    if (pc->realize) { //具体pci设备的realize函数， %pci_edu_realize
+    if (pc->realize) { //具体pci设备(是qdev的子类)的realize函数， %pci_edu_realize %pci_default_realize. 这里要完成更多工作的
         pc->realize(pci_dev, &local_err);
         if (local_err) {
             error_propagate(errp, local_err);
@@ -1987,7 +1989,7 @@ static void pci_qdev_realize(DeviceState *qdev, Error **errp)
         is_default_rom = true;
     }
 
-    pci_add_option_rom(pci_dev, is_default_rom, &local_err); //加载pci设备的rom
+    pci_add_option_rom(pci_dev, is_default_rom, &local_err); //加载pci设备的rom, 重要，将memory region与设备关联起来了
     if (local_err) {
         error_propagate(errp, local_err);
         pci_qdev_unrealize(DEVICE(pci_dev), NULL);
@@ -2502,11 +2504,11 @@ static void pci_device_class_init(ObjectClass *klass, void *data)
     DeviceClass *k = DEVICE_CLASS(klass);
     PCIDeviceClass *pc = PCI_DEVICE_CLASS(klass);
 
-    k->realize = pci_qdev_realize; //修改了其父class 的realize函数的
+    k->realize = pci_qdev_realize; //修改了其父class 的realize函数的, qdev_create_nofail中可能进入realize路径
     k->unrealize = pci_qdev_unrealize;
     k->bus_type = TYPE_PCI_BUS; //所有PCI设备挂载的总线类型必然是PCI总线咯，所以这部分信息可以放置在DviceClass中
     k->props = pci_props;
-    pc->realize = pci_default_realize;
+    pc->realize = pci_default_realize; //设置自己这个类的realize函数
 }
 
 AddressSpace *pci_device_iommu_address_space(PCIDevice *dev)
@@ -2630,7 +2632,7 @@ static const TypeInfo pci_device_type_info = {
     .name = TYPE_PCI_DEVICE,
     .parent = TYPE_DEVICE,
     .instance_size = sizeof(PCIDevice),
-    .abstract = true,
+    .abstract = true, //抽象类，没有构造函数
     .class_size = sizeof(PCIDeviceClass),
     .class_init = pci_device_class_init,
 };
