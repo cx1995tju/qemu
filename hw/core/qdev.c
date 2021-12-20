@@ -1127,7 +1127,7 @@ static void device_class_init(ObjectClass *class, void *data)
     DeviceClass *dc = DEVICE_CLASS(class);
 
     class->unparent = device_unparent;
-    dc->realize = device_realize;
+    dc->realize = device_realize; //设置了基础的realize函数，可能被其子类初始化的时候替换掉
     dc->unrealize = device_unrealize;
 
     /* by default all devices were considered as hotpluggable,

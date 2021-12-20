@@ -259,7 +259,7 @@ static void qemu_net_client_setup(NetClientState *nc,
     }
     QTAILQ_INSERT_TAIL(&net_clients, nc, next); //重点，将后端网卡结构挂载到net_clients链上，方便查找
 
-    nc->incoming_queue = qemu_new_net_queue(qemu_deliver_packet_iov, nc);
+    nc->incoming_queue = qemu_new_net_queue(qemu_deliver_packet_iov, nc); //这里挂了一个默认的回调函数
     nc->destructor = destructor;
     QTAILQ_INIT(&nc->filters);
 }

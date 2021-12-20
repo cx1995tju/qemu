@@ -244,13 +244,14 @@ static void get_netdev(Object *obj, Visitor *v, const char *name,
 //核心操作，为前端虚拟网卡结构E1000State的conf.peers成员赋值，设置, 当然其他类型网卡的话应该也有一个NICConf conf成员的, 譬如：lan9118_state
 //通过conf的peers成员，建立了前端网卡设备和后端设备的关系
 //%qdev_prop_set_netdev
+//opaque是对应的属性的结构
 static void set_netdev(Object *obj, Visitor *v, const char *name, //@name "netdev"
                        void *opaque, Error **errp)
 {
     DeviceState *dev = DEVICE(obj);
     Property *prop = opaque;
     NICPeers *peers_ptr = qdev_get_prop_ptr(dev, prop); //就是E1000State.conf.peers成员的地址, %DEFINE_NIC_PROPERTIES
-    NetClientState **ncs = peers_ptr->ncs;
+    NetClientState **ncs = peers_ptr->ncs; //拿到peers的队列端点
     NetClientState *peers[MAX_QUEUE_NUM];
     Error *local_err = NULL;
     int queues, err = 0, i = 0;
@@ -261,13 +262,13 @@ static void set_netdev(Object *obj, Visitor *v, const char *name, //@name "netde
         return;
     }
 
-    visit_type_str(v, name, &str, &local_err);
+    visit_type_str(v, name, &str, &local_err); //首先查看名字并保存
     if (local_err) {
         error_propagate(errp, local_err);
         return;
     }
 
-    queues = qemu_find_net_clients_except(str, peers,
+    queues = qemu_find_net_clients_except(str, peers, //查找对应名字的设备的NetClientState端点
                                           NET_CLIENT_DRIVER_NIC,
                                           MAX_QUEUE_NUM);
     if (queues == 0) {
@@ -281,7 +282,7 @@ static void set_netdev(Object *obj, Visitor *v, const char *name, //@name "netde
         goto out;
     }
 
-    for (i = 0; i < queues; i++) {
+    for (i = 0; i < queues; i++) { //将相关后端网卡信息保存下来
         if (peers[i] == NULL) {
             err = -ENOENT;
             goto out;
@@ -312,7 +313,7 @@ PropertyInfo qdev_prop_netdev = {
     .name  = "str",
     .description = "ID of a netdev to use as a backend",
     .get   = get_netdev,
-    .set   = set_netdev, //该属性的
+    .set   = set_netdev, //该属性的的访问器
 };
 
 /* --- vlan --- */
@@ -434,7 +435,7 @@ void qdev_set_nic_properties(DeviceState *dev, NICInfo *nd)
 {
     qdev_prop_set_macaddr(dev, "mac", nd->macaddr.a); //设置mac地址属性
     if (nd->netdev) {
-        qdev_prop_set_netdev(dev, "netdev", nd->netdev); //%set_netdev 设置dev的netdev属性，即将前端网卡与后端的设备绑定了, 什么时候添加的netdev属性 %DEFINE_NIC_PROPERTIES
+        qdev_prop_set_netdev(dev, "netdev", nd->netdev); //%set_netdev 设置dev的netdev属性，即将前端网卡与后端的设备绑定了, 什么时候添加的netdev属性(对应的网卡类型做class init的时候) %DEFINE_NIC_PROPERTIES
     }
     if (nd->nvectors != DEV_NVECTORS_UNSPECIFIED &&
         object_property_find(OBJECT(dev), "vectors", NULL)) {

@@ -1310,6 +1310,8 @@ VirtQueue *virtio_add_queue(VirtIODevice *vdev, int queue_size,
     if (i == VIRTIO_QUEUE_MAX || queue_size > VIRTQUEUE_MAX_SIZE)
         abort();
 
+    //vq的一些元数据存储，以及handle函数。 前端exit的时候，找到mr，找到virtio代理设备，进而找到具体设备，进而找到vq的handle函数
+    //%virtio_pci_config_read
     vdev->vq[i].vring.num = queue_size;
     vdev->vq[i].vring.num_default = queue_size;
     vdev->vq[i].vring.align = VIRTIO_PCI_VRING_ALIGN;
@@ -1922,10 +1924,10 @@ void virtio_instance_init_common(Object *proxy_obj, void *data,
 {
     DeviceState *vdev = data;
 
-    object_initialize(vdev, vdev_size, vdev_name);
-    object_property_add_child(proxy_obj, "virtio-backend", OBJECT(vdev), NULL);
+    object_initialize(vdev, vdev_size, vdev_name); //简单的初始化virtio设备, 构造设备
+    object_property_add_child(proxy_obj, "virtio-backend", OBJECT(vdev), NULL); //给代理设备增加了一个child属性，其孩子是对应的virtio设备
     object_unref(OBJECT(vdev));
-    qdev_alias_all_properties(vdev, proxy_obj);
+    qdev_alias_all_properties(vdev, proxy_obj); //增加一个alias属性
 }
 
 //virtio 设备初始化的公共部分
@@ -2132,7 +2134,7 @@ static void virtio_device_realize(DeviceState *dev, Error **errp)
         }
     }
 
-    virtio_bus_device_plugged(vdev, &err);
+    virtio_bus_device_plugged(vdev, &err); //这里面很重要，设置了设备相关的读写函数
     if (err != NULL) {
         error_propagate(errp, err);
         return;

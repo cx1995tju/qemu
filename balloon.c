@@ -64,6 +64,7 @@ static bool have_balloon(Error **errp)
     return true;
 }
 
+//粗暴，全局变量
 int qemu_add_balloon_handler(QEMUBalloonEvent *event_func,
                              QEMUBalloonStatus *stat_func, void *opaque)
 {

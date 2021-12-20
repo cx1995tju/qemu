@@ -1794,6 +1794,7 @@ PCIDevice *pci_nic_init_nofail(NICInfo *nd, PCIBus *rootbus,
     int devfn;
     int i;
 
+    //用于帮助命令
     if (qemu_show_nic_models(nd->model, pci_nic_models)) {
         exit(0);
     }
@@ -1813,7 +1814,7 @@ PCIDevice *pci_nic_init_nofail(NICInfo *nd, PCIBus *rootbus,
     //接下来是创建pci设备，并进行初始化 具现化的标准操作
     pci_dev = pci_create(bus, devfn, pci_nic_names[i]);
     dev = &pci_dev->qdev;
-    qdev_set_nic_properties(dev, nd); //各种属性的设置
+    qdev_set_nic_properties(dev, nd); //各种属性的设置, 包括netdev属性的设置，%netdev
 
     object_property_set_bool(OBJECT(dev), true, "realized", &err); //realize it, %pci_e1000_realize, refer to: e1000_class_init
     if (err) {

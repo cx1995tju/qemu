@@ -100,7 +100,7 @@ typedef struct DeviceClass {
     DECLARE_BITMAP(categories, DEVICE_CATEGORY_MAX); //设备种类，譬如DEVICE_CATEGORY_USB表示USB设备
     const char *fw_name; //生产设备在固件中的路径
     const char *desc; //描述设备
-    Property *props; //设备属性 C类型的 DeviceState 对应的QOM类型 TYPE_DEVICE 的对象构造函数 device_initfn 中添加了这里定义的prop
+    Property *props; //设备属性数组。 C类型的 DeviceState 对应的QOM类型 TYPE_DEVICE 的对象构造函数 device_initfn 中添加了这里定义的prop
 
     /*
      * Shall we hide this device model from -device / device_add?
@@ -238,7 +238,7 @@ struct BusState {
 struct Property {
     const char   *name;
     PropertyInfo *info;
-    ptrdiff_t    offset;
+    ptrdiff_t    offset; //一般用来指示这个property与对应的object中的哪个成员相关，即对应的object地址 + offset就是该成员的地址 refer to qdev_get_prop_ptr
     uint8_t      bitnr;
     QType        qtype;
     int64_t      defval;

@@ -1426,6 +1426,7 @@ static void virtio_pci_device_write(void *opaque, hwaddr addr,
     }
 }
 
+//为对应的BAR对应的MR设置读写函数
 static void virtio_pci_modern_regions_init(VirtIOPCIProxy *proxy)
 {
     static const MemoryRegionOps common_ops = {
@@ -1566,7 +1567,7 @@ static void virtio_pci_pre_plugged(DeviceState *d, Error **errp)
 
 /* This is called by virtio-bus just after the device is plugged. */
 //plugged 后，qemu侧就准备好了virtio 设备了
-//需要设置好代理设备和设备的空间，然后通过memory region注册进入，并且设置好读写函数virtio_write_config virtio_read_config, 后续vm-exit的时候，才能捕获
+//需要设置好代理设备和设备的空间，然后通过memory region注册进入，并且设置PCI代理设备读写函数%virtio_pci_config_write , 以及virtio设备的读写函数%virtio_write_config 后续vm-exit的时候，才能捕获
 static void virtio_pci_device_plugged(DeviceState *d, Error **errp)
 {
     VirtIOPCIProxy *proxy = VIRTIO_PCI(d);
@@ -1638,7 +1639,7 @@ static void virtio_pci_device_plugged(DeviceState *d, Error **errp)
 
         struct virtio_pci_cfg_cap *cfg_mask;
 
-        virtio_pci_modern_regions_init(proxy);
+        virtio_pci_modern_regions_init(proxy); //初始化了对应的MR的读写函数
 
         virtio_pci_modern_mem_region_map(proxy, &proxy->common, &cap);
         virtio_pci_modern_mem_region_map(proxy, &proxy->isr, &cap);
@@ -1692,7 +1693,7 @@ static void virtio_pci_device_plugged(DeviceState *d, Error **errp)
         size = pow2ceil(size);
 
         memory_region_init_io(&proxy->bar, OBJECT(proxy),
-                              &virtio_pci_config_ops,
+                              &virtio_pci_config_ops, //设置了代理设备的对应的bar的 MR读写函数
                               proxy, "virtio-pci", size);
 
         pci_register_bar(&proxy->pci_dev, proxy->legacy_io_bar_idx,
@@ -1768,7 +1769,7 @@ static void virtio_pci_realize(PCIDevice *pci_dev, Error **errp)
 
     /* subclasses can enforce modern, so do this unconditionally */
     //virtio 设备独特的bar布局
-    memory_region_init(&proxy->modern_bar, OBJECT(proxy), "virtio-pci",
+    memory_region_init(&proxy->modern_bar, OBJECT(proxy), "virtio-pci", //创建代理设备bar MR
                        /* PCI BAR regions must be powers of 2 */
                        pow2ceil(proxy->notify.offset + proxy->notify.size));
 
@@ -1779,7 +1780,7 @@ static void virtio_pci_realize(PCIDevice *pci_dev, Error **errp)
                              0,
                              memory_region_size(&proxy->modern_bar));
 
-    address_space_init(&proxy->modern_as, &proxy->modern_cfg, "virtio-pci-cfg-as");
+    address_space_init(&proxy->modern_as, &proxy->modern_cfg, "virtio-pci-cfg-as"); //这里会提交内存布局到KVM的
 
     if (proxy->disable_legacy == ON_OFF_AUTO_AUTO) {
         proxy->disable_legacy = pcie_port ? ON_OFF_AUTO_ON : ON_OFF_AUTO_OFF;
@@ -1793,6 +1794,7 @@ static void virtio_pci_realize(PCIDevice *pci_dev, Error **errp)
         return;
     }
 
+    //该做的初始化
     if (pcie_port && pci_is_express(pci_dev)) {
         int pos;
 
@@ -1882,6 +1884,7 @@ static void virtio_pci_dc_realize(DeviceState *qdev, Error **errp)
 }
 
 //type_initialize 调用过来的
+//主要是设置一些属性和一些函数，一些metadata
 static void virtio_pci_class_init(ObjectClass *klass, void *data)
 {
     DeviceClass *dc = DEVICE_CLASS(klass);
@@ -2148,19 +2151,19 @@ static Property virtio_balloon_pci_properties[] = {
     DEFINE_PROP_UINT32("class", VirtIOPCIProxy, class_code, 0),
     DEFINE_PROP_END_OF_LIST(),
 };
-
+//第一个参数是代理设备
 static void virtio_balloon_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
 {
     VirtIOBalloonPCI *dev = VIRTIO_BALLOON_PCI(vpci_dev);
-    DeviceState *vdev = DEVICE(&dev->vdev);
+    DeviceState *vdev = DEVICE(&dev->vdev); //这个是virtio设备
 
     if (vpci_dev->class_code != PCI_CLASS_OTHERS &&
         vpci_dev->class_code != PCI_CLASS_MEMORY_RAM) { /* qemu < 1.1 */
         vpci_dev->class_code = PCI_CLASS_OTHERS;
     }
 
-    qdev_set_parent_bus(vdev, BUS(&vpci_dev->bus));
-    object_property_set_bool(OBJECT(vdev), true, "realized", errp); //在这个代理设备的realize函数里，去realize真实的virtio设备 %virtio_device_realize
+    qdev_set_parent_bus(vdev, BUS(&vpci_dev->bus)); //vdev是virtio设备, 将其挂载到virtio bus总线上
+    object_property_set_bool(OBJECT(vdev), true, "realized", errp); //在这个代理设备的realize函数里，去realize真实的virtio设备 %virtio_device_realize。virtio设备的realize是realize virtio代理设备来进行的。
 }
 
 //相关的realize函数调用顺序，参考virtio_pci_class_init 注释
@@ -2183,7 +2186,7 @@ static void virtio_balloon_pci_instance_init(Object *obj)
 {
     VirtIOBalloonPCI *dev = VIRTIO_BALLOON_PCI(obj);
 
-    virtio_instance_init_common(obj, &dev->vdev, sizeof(dev->vdev),
+    virtio_instance_init_common(obj, &dev->vdev, sizeof(dev->vdev), //对其关联的virtio设备做一些common的初始化
                                 TYPE_VIRTIO_BALLOON);
     object_property_add_alias(obj, "guest-stats", OBJECT(&dev->vdev),
                                   "guest-stats", &error_abort);

@@ -1593,7 +1593,7 @@ static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
     uint8_t *pci_conf;
     uint8_t *macaddr;
 
-    pci_dev->config_write = e1000_write_config; //pci相关的一些函数
+    pci_dev->config_write = e1000_write_config; //pci相关的一些函数, 设置好pci模拟的回调函数, 参考PCI设备模拟的通用部分描述
 
     pci_conf = pci_dev->config;
 
@@ -1602,7 +1602,7 @@ static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
 
     pci_conf[PCI_INTERRUPT_PIN] = 1; /* interrupt pin A */
 
-    e1000_mmio_setup(d); //mmio读写设置
+    e1000_mmio_setup(d); //mmio读写设置, 添加一些MMIO的region，并且更新到KVM的
 
     pci_register_bar(pci_dev, 0, PCI_BASE_ADDRESS_SPACE_MEMORY, &d->mmio); //pci bar设置
 
@@ -1617,7 +1617,7 @@ static void pci_e1000_realize(PCIDevice *pci_dev, Error **errp)
                                PCI_DEVICE_GET_CLASS(pci_dev)->device_id,
                                macaddr);
 
-    //创建一个新的网卡设备了
+    //创建一个新的网卡设备了, 这里的核心函数, 这个net_e1000_info是最重要的，其中包括一些收包的回调函数。
     d->nic = qemu_new_nic(&net_e1000_info, &d->conf,
                           object_get_typename(OBJECT(d)), dev->id, d);
 
@@ -1633,6 +1633,7 @@ static void qdev_e1000_reset(DeviceState *dev)
     e1000_reset(d);
 }
 
+//这是一个数组，后面定义了多个成员，都是属性
 static Property e1000_properties[] = {
     DEFINE_NIC_PROPERTIES(E1000State, conf),
     DEFINE_PROP_BIT("autonegotiation", E1000State,
@@ -1670,7 +1671,7 @@ static void e1000_class_init(ObjectClass *klass, void *data)
     dc->desc = "Intel Gigabit Ethernet";
     dc->reset = qdev_e1000_reset;
     dc->vmsd = &vmstate_e1000;
-    dc->props = e1000_properties; //TYPE_DEVICE对象初始化的时候会添加属性的
+    dc->props = e1000_properties; //TYPE_DEVICE类型的对象初始化的时候会添加属性的 %device_initfn
 }
 
 static void e1000_instance_init(Object *obj)

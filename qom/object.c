@@ -917,6 +917,7 @@ void object_unref(Object *obj)
 
 //为对象obj添加一个名为name，类型是type， 对应的set get release函数的属性
 //本质就是在对象的properties hash 表上插入了一个属性结构ObjectProperty
+//这个opaque后续会作为参数传递给get set函数的
 ObjectProperty *
 object_property_add(Object *obj, const char *name, const char *type,
                     ObjectPropertyAccessor *get,
