@@ -56,7 +56,7 @@ typedef struct TAPState {
     bool using_vnet_hdr;
     bool has_ufo;
     bool enabled;
-    VHostNetState *vhost_net;
+    VHostNetState *vhost_net; //如果是vhost-net 卸载的话，tap设备就用这个成员保存对应的vhost-net信息
     unsigned host_vnet_hdr_len;
     Notifier exit;
 } TAPState;
@@ -677,7 +677,7 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
         vhostfdname || (tap->has_vhostforce && tap->vhostforce)) {
         VhostNetOptions options;
 
-        options.backend_type = VHOST_BACKEND_TYPE_KERNEL;
+        options.backend_type = VHOST_BACKEND_TYPE_KERNEL; //是vhost kernel
         options.net_backend = &s->nc;
         if (tap->has_poll_us) {
             options.busyloop_timeout = tap->poll_us;
@@ -692,16 +692,16 @@ static void net_init_tap_one(const NetdevTapOptions *tap, NetClientState *peer,
                 return;
             }
         } else {
-            vhostfd = open("/dev/vhost-net", O_RDWR); //vhost入口, tap设备通过vhost卸载了？？
+            vhostfd = open("/dev/vhost-net", O_RDWR); //vhost入口, tap设备通过vhost卸载了？？ 没有指定vhostfdname的话，就需要通过open接口创建一个fd，后续用这个与内核的vhost模块交互
             if (vhostfd < 0) {
                 error_setg_errno(errp, errno,
                                  "tap: open vhost char device failed");
                 return;
             }
         }
-        options.opaque = (void *)(uintptr_t)vhostfd;
+        options.opaque = (void *)(uintptr_t)vhostfd; //存储vhostfd, 后续用这个与vhost-net模块交互，完成数据面的卸载
 
-        s->vhost_net = vhost_net_init(&options);
+        s->vhost_net = vhost_net_init(&options); //这里是vhost kernel机制的核心函数
         if (!s->vhost_net) {
             error_setg(errp,
                        "vhost-net requested but could not be initialized");

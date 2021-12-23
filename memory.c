@@ -1953,6 +1953,7 @@ void memory_region_clear_global_locking(MemoryRegion *mr)
 
 static bool userspace_eventfd_warning;
 
+//关键就是构建mr与e的联系，并且注册到KVM中
 void memory_region_add_eventfd(MemoryRegion *mr, //该io地址所在的memory region
                                hwaddr addr, //io地址
                                unsigned size, //io大小
@@ -1992,7 +1993,7 @@ void memory_region_add_eventfd(MemoryRegion *mr, //该io地址所在的memory re
             sizeof(*mr->ioeventfds) * (mr->ioeventfd_nb-1 - i));
     mr->ioeventfds[i] = mrfd;
     ioeventfd_update_pending |= mr->enabled;
-    memory_region_transaction_commit();
+    memory_region_transaction_commit(); //这也是mr发生变化了，需要commit的
 }
 
 void memory_region_del_eventfd(MemoryRegion *mr,

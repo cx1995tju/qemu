@@ -37,10 +37,11 @@
 #include "hw/virtio/vhost.h"
 #include "hw/virtio/virtio-bus.h"
 
+//只需要保存一些元信息就可以了，卸载后，数据面压根不需要qemu去做处理
 struct vhost_net {
-    struct vhost_dev dev;
+    struct vhost_dev dev; //everything in QOM is a device
     struct vhost_virtqueue vqs[2];
-    int backend;
+    int backend; //对应的tap设备的fd, 因为要把这个信息告诉内核的vhost-net模块，才能让其知道数据面应该和谁交互的。如果是vhost uesr的话, 应该就是对应的unix socket 的fd
     NetClientState *nc;
 };
 
@@ -140,7 +141,7 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
 {
     int r;
     bool backend_kernel = options->backend_type == VHOST_BACKEND_TYPE_KERNEL;
-    struct vhost_net *net = g_new0(struct vhost_net, 1);
+    struct vhost_net *net = g_new0(struct vhost_net, 1); //核心结构，都是围绕这个函数的构造的
     uint64_t features = 0;
 
     if (!options->net_backend) {
@@ -150,11 +151,11 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
     net->nc = options->net_backend;
 
     net->dev.max_queues = 1;
-    net->dev.nvqs = 2;
+    net->dev.nvqs = 2; //这个硬编码，确定了vhost只有一个接收队列和一个发送队列
     net->dev.vqs = net->vqs;
 
     if (backend_kernel) {
-        r = vhost_net_get_fd(options->net_backend);
+        r = vhost_net_get_fd(options->net_backend); //获取了对应的tap设备的fd了
         if (r < 0) {
             goto fail;
         }
@@ -171,7 +172,8 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
         net->dev.vq_index = net->nc->queue_index * net->dev.nvqs;
     }
 
-    r = vhost_dev_init(&net->dev, options->opaque,
+    //核心中的核心
+    r = vhost_dev_init(&net->dev, options->opaque, //初始化其中的dev成员
                        options->backend_type, options->busyloop_timeout);
     if (r < 0) {
         goto fail;
@@ -200,7 +202,7 @@ struct vhost_net *vhost_net_init(VhostNetOptions *options)
         }
     }
 
-    vhost_net_ack_features(net, features);
+    vhost_net_ack_features(net, features); //设置vhost_dev的feature
 
     return net;
 

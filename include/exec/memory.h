@@ -228,7 +228,7 @@ struct MemoryRegion {
     QTAILQ_HEAD(coalesced_ranges, CoalescedMemoryRange) coalesced;
     const char *name;
     unsigned ioeventfd_nb; //ioeventfd的数目
-    MemoryRegionIoeventfd *ioeventfds; //按照地址从小到大的顺序保存了所有注册的ioeventfd
+    MemoryRegionIoeventfd *ioeventfds; //按照地址从小到大的顺序保存了所有注册的ioeventfd, 一个MR是可以关联多个ioeventfd的
     QLIST_HEAD(, IOMMUNotifier) iommu_notify;
     IOMMUNotifierFlag iommu_notify_flags;
 };

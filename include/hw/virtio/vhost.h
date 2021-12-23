@@ -7,6 +7,7 @@
 #include "exec/memory.h"
 
 /* Generic structures common for any vhost based device. */
+//要卸载数据面到vhost，当然要初始化vq相关的信息了, 但这里实际上保存的信息很少的(相对于virtqueue)，因为数据面已经卸载了。
 struct vhost_virtqueue {
     int kick;
     int call;
@@ -20,7 +21,7 @@ struct vhost_virtqueue {
     unsigned avail_size;
     unsigned long long used_phys;
     unsigned used_size;
-    EventNotifier masked_notifier;
+    EventNotifier masked_notifier; //对应的eventfd
 };
 
 typedef unsigned long vhost_log_chunk_t;
@@ -37,7 +38,7 @@ struct vhost_log {
 };
 
 struct vhost_memory;
-struct vhost_dev {
+struct vhost_dev { //对内核的vhost的抽象
     MemoryListener memory_listener;
     struct vhost_memory *mem;
     int n_mem_sections;
@@ -58,8 +59,8 @@ struct vhost_dev {
     bool memory_changed;
     hwaddr mem_changed_start_addr;
     hwaddr mem_changed_end_addr;
-    const VhostOps *vhost_ops;
-    void *opaque;
+    const VhostOps *vhost_ops; //vhost-net vhost-user的ops是不同 %vhost_set_backend_type
+    void *opaque; //保存kernel对应的tap设备的fd, 如果是vhost uesr的话, 应该就是对应的unix socket 的fd
     struct vhost_log *log;
     QLIST_ENTRY(vhost_dev) entry;
 };

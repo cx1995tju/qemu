@@ -7,11 +7,13 @@
 struct vhost_net;
 typedef struct vhost_net VHostNetState;
 
+//QEMU 保存的vhost机制的元数据
+//因为数据面卸载了，所以这个结构需要保存的信息其实并不多的
 typedef struct VhostNetOptions {
     VhostBackendType backend_type;
     NetClientState *net_backend;
     uint32_t busyloop_timeout;
-    void *opaque;
+    void *opaque; //可能是vhostfd     refer to %net_init_tap_one
 } VhostNetOptions;
 
 uint64_t vhost_net_get_max_queues(VHostNetState *net);

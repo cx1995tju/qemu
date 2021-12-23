@@ -81,7 +81,7 @@ typedef struct VhostOps {
     VhostBackendType backend_type;
     vhost_backend_init vhost_backend_init;
     vhost_backend_cleanup vhost_backend_cleanup;
-    vhost_backend_memslots_limit vhost_backend_memslots_limit;
+    vhost_backend_memslots_limit vhost_backend_memslots_limit; //返回vhost下最大的内存槽数目
     vhost_net_set_backend_op vhost_net_set_backend;
     vhost_scsi_set_endpoint_op vhost_scsi_set_endpoint;
     vhost_scsi_clear_endpoint_op vhost_scsi_clear_endpoint;

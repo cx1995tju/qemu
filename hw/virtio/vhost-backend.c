@@ -206,8 +206,8 @@ static const VhostOps kernel_ops = {
         .vhost_set_vring_busyloop_timeout =
                                 vhost_kernel_set_vring_busyloop_timeout,
         .vhost_set_features = vhost_kernel_set_features,
-        .vhost_get_features = vhost_kernel_get_features,
-        .vhost_set_owner = vhost_kernel_set_owner,
+        .vhost_get_features = vhost_kernel_get_features, //会返回vhost-net的virtio后端的feature
+        .vhost_set_owner = vhost_kernel_set_owner, //会创建一个内核现场
         .vhost_reset_device = vhost_kernel_reset_device,
         .vhost_get_vq_index = vhost_kernel_get_vq_index,
 #ifdef CONFIG_VHOST_VSOCK

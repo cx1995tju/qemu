@@ -1046,6 +1046,7 @@ static int vhost_virtqueue_set_busyloop_timeout(struct vhost_dev *dev,
     return 0;
 }
 
+//要卸载数据面到vhost，当然要初始化vq相关的信息了, 但这里实际上保存的信息很少的，因为数据面已经卸载了。
 static int vhost_virtqueue_init(struct vhost_dev *dev,
                                 struct vhost_virtqueue *vq, int n)
 {
@@ -1053,13 +1054,13 @@ static int vhost_virtqueue_init(struct vhost_dev *dev,
     struct vhost_vring_file file = {
         .index = vhost_vq_index,
     };
-    int r = event_notifier_init(&vq->masked_notifier, 0);
+    int r = event_notifier_init(&vq->masked_notifier, 0); //搞一个event fd
     if (r < 0) {
         return r;
     }
 
     file.fd = event_notifier_get_fd(&vq->masked_notifier);
-    r = dev->vhost_ops->vhost_set_vring_call(dev, &file);
+    r = dev->vhost_ops->vhost_set_vring_call(dev, &file); //将eventfd 和 对应的vq的序号传递给内核，让内核来建立联系 %ioctl(VHOST_SET_VRING_CALL), 这样内核就能通过eventfd来通知虚拟机了。
     if (r) {
         VHOST_OPS_DEBUG("vhost_set_vring_call failed");
         r = -errno;
@@ -1076,18 +1077,18 @@ static void vhost_virtqueue_cleanup(struct vhost_virtqueue *vq)
     event_notifier_cleanup(&vq->masked_notifier);
 }
 
-int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
-                   VhostBackendType backend_type, uint32_t busyloop_timeout)
+int vhost_dev_init(struct vhost_dev *hdev, void *opaque, //opaque是对应的tap设备的fd
+                   VhostBackendType backend_type, uint32_t busyloop_timeout) //backend type 有两类 vhost-net, vhost-user
 {
     uint64_t features;
     int i, r, n_initialized_vqs = 0;
 
     hdev->migration_blocker = NULL;
 
-    r = vhost_set_backend_type(hdev, backend_type);
+    r = vhost_set_backend_type(hdev, backend_type); //主要是根据backend的类型不同，设置不同的ops %user_ops %kernel_ops
     assert(r >= 0);
 
-    r = hdev->vhost_ops->vhost_backend_init(hdev, opaque);
+    r = hdev->vhost_ops->vhost_backend_init(hdev, opaque); //不同的backend，其ops是不同的，vhost-net 和 vhost-user %vhost_kernel_init
     if (r < 0) {
         goto fail;
     }
@@ -1112,7 +1113,7 @@ int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
     }
 
     for (i = 0; i < hdev->nvqs; ++i, ++n_initialized_vqs) {
-        r = vhost_virtqueue_init(hdev, hdev->vqs + i, hdev->vq_index + i);
+        r = vhost_virtqueue_init(hdev, hdev->vqs + i, hdev->vq_index + i); //要卸载数据面到vhost，当然要初始化vq相关的信息了, 但这里实际上保存的信息很少的，因为数据面已经卸载了。
         if (r < 0) {
             goto fail;
         }
@@ -1168,7 +1169,7 @@ int vhost_dev_init(struct vhost_dev *hdev, void *opaque,
     hdev->log_enabled = false;
     hdev->started = false;
     hdev->memory_changed = false;
-    memory_listener_register(&hdev->memory_listener, &address_space_memory);
+    memory_listener_register(&hdev->memory_listener, &address_space_memory); //注册一个memory listener，这个listener主要是用来控制热迁移中的脏页记录的。 不使用vhost的时候，脏页面都可以被EPT给标记，使用了之后，vring中desc指向的内存也会被vhost模块给标记为脏页，需要有方法记录这些脏页，这样在热迁移的时候可以使用。
     QLIST_INSERT_HEAD(&vhost_devices, hdev, entry);
     return 0;
 
