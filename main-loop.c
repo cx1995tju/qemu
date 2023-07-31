@@ -71,6 +71,8 @@ static void sigfd_handler(void *opaque)
     }
 }
 
+
+// 基于 sigfd 机制, 将信号处理纳入了 qemu 的事件循环
 static int qemu_signal_init(void)
 {
     int sigfd;
@@ -178,6 +180,9 @@ static int max_priority;
 static int glib_pollfds_idx;
 static int glib_n_poll_fds;
 
+// qemu 自己基于 glib 实现的
+// 用于获取所有需要监听的fd，并且计算一个 最小的 timeout
+// 所有监听的 fd 保存在全局数组 gpollfds 中
 static void glib_pollfds_fill(int64_t *cur_timeout)
 {
     GMainContext *context = g_main_context_default();
@@ -224,7 +229,7 @@ static int os_host_main_loop_wait(int64_t timeout)
     int ret;
     static int spin_counter;
 
-    glib_pollfds_fill(&timeout);
+    glib_pollfds_fill(&timeout);	// 这一步完成后，获取了所有需要监听的fd，保存在 gpollfds 中
 
     /* If the I/O thread is very busy or we are incorrectly busy waiting in
      * the I/O thread, this can lead to starvation of the BQL such that the
@@ -247,18 +252,18 @@ static int os_host_main_loop_wait(int64_t timeout)
 
     if (timeout) {
         spin_counter = 0;
-        qemu_mutex_unlock_iothread();
+        qemu_mutex_unlock_iothread(); //释放 qemu 大锁，在哪里获取的呢？ vl.c:main
     } else {
         spin_counter++;
     }
 
-    ret = qemu_poll_ns((GPollFD *)gpollfds->data, gpollfds->len, timeout);
+    ret = qemu_poll_ns((GPollFD *)gpollfds->data, gpollfds->len, timeout); // 会阻塞主线程
 
     if (timeout) {
         qemu_mutex_lock_iothread();
     }
 
-    glib_pollfds_poll();
+    glib_pollfds_poll(); // 这里面开始分发事件了
     return ret;
 }
 #else
@@ -502,11 +507,11 @@ int main_loop_wait(int nonblocking)
         timeout_ns = (uint64_t)timeout * (int64_t)(SCALE_MS);
     }
 
-    timeout_ns = qemu_soonest_timeout(timeout_ns,
+    timeout_ns = qemu_soonest_timeout(timeout_ns, // 从定时器中获取一个最小的 timeout, 用这个 timeout 告诉 后续的 主循环，最多阻塞这么久
                                       timerlistgroup_deadline_ns(
                                           &main_loop_tlg));
 
-    ret = os_host_main_loop_wait(timeout_ns);
+    ret = os_host_main_loop_wait(timeout_ns); // 主循环
 #ifdef CONFIG_SLIRP
     slirp_pollfds_poll(gpollfds, (ret < 0));
 #endif

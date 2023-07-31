@@ -196,7 +196,7 @@ static AioHandler *find_aio_handler(AioContext *ctx, int fd)
     return NULL;
 }
 
-//添加或删除事件源中的fd
+//添加或删除 AioContext 事件源中的fd
 void aio_set_fd_handler(AioContext *ctx,
                         int fd,
                         bool is_external,

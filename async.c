@@ -354,7 +354,7 @@ AioContext *aio_context_new(Error **errp)
     int ret;
     AioContext *ctx;
 
-    //new AioContext类型的一个事件源
+    //new AioContext类型的一个事件源, glib 库的基本使用
     ctx = (AioContext *) g_source_new(&aio_source_funcs, sizeof(AioContext));
     aio_context_setup(ctx);
 

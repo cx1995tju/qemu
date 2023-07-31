@@ -1998,11 +1998,12 @@ static void help(int exitcode)
 
 #define HAS_ARG 0x0001
 
+// 用于记录合法的选项
 typedef struct QEMUOption {
-    const char *name;
-    int flags;
-    int index;
-    uint32_t arch_mask;
+    const char *name; // 选项名
+    int flags; // 选项的一些属性，譬如是否有子参数
+    int index; // 通过 index 可以知道是哪个选项
+    uint32_t arch_mask; // 选项你支持的 架构
 } QEMUOption;
 
 static const QEMUOption qemu_options[] = {
@@ -2758,7 +2759,7 @@ static const QEMUOption *lookup_opt(int argc, char **argv,
             error_report("invalid option");
             exit(1);
         }
-        if (!strcmp(popt->name, r + 1))
+        if (!strcmp(popt->name, r + 1))	// 用于判断参数是否合法
             break;
         popt++;
     }
@@ -3035,7 +3036,7 @@ int main(int argc, char **argv, char **envp)
 
     qemu_init_cpu_list();
     qemu_init_cpu_loop();
-    qemu_mutex_lock_iothread();
+    qemu_mutex_lock_iothread();	// 无语，这里加锁
 
     atexit(qemu_run_exit_notifiers);
     error_set_progname(argv[0]);
@@ -3130,7 +3131,7 @@ int main(int argc, char **argv, char **envp)
     }
 
     /* second pass of option parsing */
-    optind = 1;
+    optind = 1; // 解析命令行参数，然后将解析结果组织到 vm_config_groups 全局数组中
     for(;;) {
         if (optind >= argc)
             break;
@@ -3139,12 +3140,12 @@ int main(int argc, char **argv, char **envp)
         } else {
             const QEMUOption *popt;
 
-            popt = lookup_opt(argc, argv, &optarg, &optind);
+            popt = lookup_opt(argc, argv, &optarg, &optind); // 能返回说明肯定合法了，否则会直接在 lookup_opt 中退出
             if (!(popt->arch_mask & arch_type)) {
                 error_report("Option not supported for this target");
                 exit(1);
             }
-            switch(popt->index) {
+            switch(popt->index) { // 各个类型参数的解析，就 case by case 的看了，其中最重要的就是 -device
             case QEMU_OPTION_no_kvm_irqchip: {
                 olist = qemu_find_opts("machine");
                 qemu_opts_parse_noisily(olist, "kernel_irqchip=off", false);
@@ -3761,8 +3762,8 @@ int main(int argc, char **argv, char **envp)
                 qemu_opts_parse_noisily(olist, "usb=on", false);
                 add_device_config(DEV_USB, optarg);
                 break;
-            case QEMU_OPTION_device:
-                if (!qemu_opts_parse_noisily(qemu_find_opts("device"),
+            case QEMU_OPTION_device: // 最重要
+                if (!qemu_opts_parse_noisily(qemu_find_opts("device"),	// 返回
                                              optarg, true)) {
                     exit(1);
                 }
