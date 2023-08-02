@@ -38,7 +38,7 @@
 #define DMA_SIZE        4096
 
 typedef struct {
-    PCIDevice pdev;
+    PCIDevice pdev; // 对象之间的层次关系，first-member inherit
     MemoryRegion mmio;
 
     QemuThread thread;
@@ -403,7 +403,7 @@ static void edu_class_init(ObjectClass *class, void *data)
     k->realize = pci_edu_realize;
     k->exit = pci_edu_uninit;
     k->vendor_id = PCI_VENDOR_ID_QEMU;
-    k->device_id = 0x11e8;
+    k->device_id = 0x11e8; // 通过这个 pci 类型 init 出来的所有设备的 vendor id 都是这个
     k->revision = 0x10;
     k->class_id = PCI_CLASS_OTHERS;
 }
@@ -413,7 +413,7 @@ static void pci_edu_register_types(void)
     static const TypeInfo edu_info = {
         .name          = "edu",
         .parent        = TYPE_PCI_DEVICE,
-        .instance_size = sizeof(EduState),
+        .instance_size = sizeof(EduState), // 创建出来的对象是这个类型
         .instance_init = edu_instance_init,
         .class_init    = edu_class_init,
     };

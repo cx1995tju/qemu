@@ -288,10 +288,10 @@ static void pc_init1(MachineState *machine,
 
         object_property_add_link(OBJECT(machine), PC_MACHINE_ACPI_DEVICE_PROP,
                                  TYPE_HOTPLUG_HANDLER,
-                                 (Object **)&pcms->acpi_dev,
+                                 (Object **)&pcms->acpi_dev, // 这个是 link property 的child
                                  object_property_allow_set_link,
                                  OBJ_PROP_LINK_UNREF_ON_RELEASE, &error_abort);
-        object_property_set_link(OBJECT(machine), OBJECT(piix4_pm),
+        object_property_set_link(OBJECT(machine), OBJECT(piix4_pm), // set 函数将 link property 的 child 指向的指针的值设置为 piix4_pm
                                  PC_MACHINE_ACPI_DEVICE_PROP, &error_abort);
     }
 

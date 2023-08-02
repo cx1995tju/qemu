@@ -43,7 +43,7 @@ struct InterfaceImpl
 //类型的实现，是全局per 类型唯一的, refer to %type_table_add
 struct TypeImpl
 {
-    const char *name; //类名字
+    const char *name; //类名字, 唯一 id
 
     size_t class_size; //类的大小
 
@@ -187,10 +187,10 @@ static bool type_has_parent(TypeImpl *type)
 static size_t type_class_get_size(TypeImpl *ti)
 {
     if (ti->class_size) {
-        return ti->class_size;
+        return ti->class_size; // 一个类型有的话就直接用
     }
 
-    if (type_has_parent(ti)) {
+    if (type_has_parent(ti)) { // 没有的话，就使用其父亲的 class_size, 说明这个类型没有一些 class specific 的信息需要保存
         return type_class_get_size(type_get_parent(ti));
     }
 
@@ -292,7 +292,7 @@ static void type_initialize(TypeImpl *ti)
         g_assert_cmpint(parent->class_size, <=, ti->class_size); //父亲类型，不应该大于子类型的
         memcpy(ti->class, parent->class, parent->class_size); //层次化来初始化所有Type的class成员。 妙妙妙。 一层一层的将祖先的class信息copy下来
         ti->class->interfaces = NULL;
-        ti->class->properties = g_hash_table_new_full(
+        ti->class->properties = g_hash_table_new_full( // 创建了保存类属性的 hash 表
             g_str_hash, g_str_equal, g_free, object_property_free);
 
         for (e = parent->class->interfaces; e; e = e->next) {
@@ -918,6 +918,7 @@ void object_unref(Object *obj)
 //为对象obj添加一个名为name，类型是type， 对应的set get release函数的属性
 //本质就是在对象的properties hash 表上插入了一个属性结构ObjectProperty
 //这个opaque后续会作为参数传递给get set函数的
+// 给 obj 对象，增加一个 名字为 name，类型为 type，操作函数为 get/set/release，操作对象是 opaque 的属性
 ObjectProperty *
 object_property_add(Object *obj, const char *name, const char *type,
                     ObjectPropertyAccessor *get,
@@ -1388,6 +1389,7 @@ static void object_finalize_child_property(Object *obj, const char *name,
 }
 
 //必须强调，这里指的是对象的父子关系，与类的父子关系不是一回事。
+//譬如：一个 bus 可以有很多 child device
 void object_property_add_child(Object *obj, const char *name,
                                Object *child, Error **errp)
 {
@@ -1517,7 +1519,7 @@ static void object_set_link_property(Object *obj, Visitor *v,
     }
 
     object_ref(new_target);
-    *child = new_target; //最关键的地方，建立了两个对象的关系
+    *child = new_target; //最关键的地方，建立了两个对象的关系。注意child 是二级指针。这里做了解引用，即设置的是一级指针。 而不是 child = new_target。即 child 的指向的位置还是不变的。但是 child 指向的指针的值变化了
     object_unref(old_target);
 }
 

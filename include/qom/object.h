@@ -332,14 +332,14 @@ typedef void (ObjectPropertyRelease)(Object *obj,
 //属性的本质是什么：kv对 + 解析函数(get set resolve) + 描述信息, refer to %ObjectProperty
 typedef struct ObjectProperty
 {
-    gchar *name;
-    gchar *type;
-    gchar *description;
+    gchar *name; // 属性名字
+    gchar *type; // 属性也是有类型的，这是类型的名字
+    gchar *description; // 属性的描述
     ObjectPropertyAccessor *get;
     ObjectPropertyAccessor *set;
     ObjectPropertyResolve *resolve;
     ObjectPropertyRelease *release;
-    void *opaque; //指向某个具体的属性，譬如：BoolProperty, 可以认为这个结构就是属性的父类，或者公共部分，opaque指向的则是具体的属性。
+    void *opaque; // 属性的值, 其类型就是前面的type，譬如：child 属性，这个 opaque 就是 指向 child 对象的指针；譬如：LinkProperty
 } ObjectProperty;
 
 /**
@@ -448,13 +448,13 @@ struct Object
  */
 struct TypeInfo
 {
-    const char *name;
+    const char *name; // name 是唯一id
     const char *parent; //父类型，描述了类型之间的继承关系
 
     size_t instance_size;	//该类型的实例的大小
     void (*instance_init)(Object *obj); //该类型的实例的构造函数
     void (*instance_post_init)(Object *obj); //对象的构造函数完成后, 做一些额外的工作
-    void (*instance_finalize)(Object *obj);
+    void (*instance_finalize)(Object *obj); // 对象的析构函数
 
     bool abstract;
     size_t class_size;
