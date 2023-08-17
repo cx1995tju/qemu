@@ -193,7 +193,7 @@ static void pc_init1(MachineState *machine,
     }
 
     if (pcmc->pci_enabled) {
-        pci_bus = i440fx_init(host_type,
+        pci_bus = i440fx_init(host_type, // 对主板上的各个设备做初始化，譬如：北桥，南桥等
                               pci_type,
                               &i440fx_state, &piix3_devfn, &isa_bus, pcms->gsi,
                               system_memory, system_io, machine->ram_size,

@@ -363,7 +363,7 @@ struct CPUState { //存储一些CPU相关的通用信息，参考 %X86CPU
     int kvm_fd;
     bool kvm_vcpu_dirty;
     struct KVMState *kvm_state;
-    struct kvm_run *kvm_run;
+    struct kvm_run *kvm_run; // kvm share 的 mem，和 qemu 共享一些数据, refer to: kvm_init_vcpu
 
     /*
      * Used for events with 'vcpu' and *without* the 'disabled' properties.

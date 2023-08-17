@@ -56,11 +56,12 @@ typedef struct QemuOptDesc {
     const char *def_value_str;
 } QemuOptDesc;
 
+// vm_config_groups 数组里存储的是该结构的指针
 struct QemuOptsList {
     const char *name;
-    const char *implied_opt_name;
+    const char *implied_opt_name; // refer to opts_parse, 如果解析的时候允许缩写的话，就使用 implied_opt_name
     bool merge_lists;  /* Merge multiple uses of option into a single list? */
-    QTAILQ_HEAD(, QemuOpts) head;
+    QTAILQ_HEAD(, QemuOpts) head; // 所有该类型的选项都被组织到 一个 list 中
     QemuOptDesc desc[];
 };
 

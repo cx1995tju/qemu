@@ -373,7 +373,7 @@ typedef void (ObjectFree)(void *obj);
 struct ObjectClass
 {
     /*< private >*/
-    Type type;
+    Type type; // 就是 TypeImpl *
     GSList *interfaces;
 
     const char *object_cast_cache[OBJECT_CLASS_CAST_CACHE];
@@ -448,8 +448,8 @@ struct Object
  */
 struct TypeInfo
 {
-    const char *name; // name 是唯一id
-    const char *parent; //父类型，描述了类型之间的继承关系
+    const char *name; // name 是唯一id, QOM 内部使用的
+    const char *parent; //父类型，描述了类型之间的继承关系, 也是 QOM 机制内部用来记录继承关系的
 
     size_t instance_size;	//该类型的实例的大小
     void (*instance_init)(Object *obj); //该类型的实例的构造函数

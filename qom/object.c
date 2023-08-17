@@ -43,11 +43,11 @@ struct InterfaceImpl
 //类型的实现，是全局per 类型唯一的, refer to %type_table_add
 struct TypeImpl
 {
-    const char *name; //类名字, 唯一 id
+    const char *name; //类名字, 唯一 id, QOM 机制内部使用
 
-    size_t class_size; //类的大小
+    size_t class_size; //类的大小, QOM 机制内部使用
 
-    size_t instance_size; //该类定义的对象的大小
+    size_t instance_size; //该类定义的对象的大小, QOM 机制内部使用
 
     //类初始化相关的函数，牢记：因为QOM的类相关概念都是运行时构建的，所以这些在c++中编译器做的事情我们必须自己做
     void (*class_init)(ObjectClass *klass, void *data);
@@ -56,7 +56,7 @@ struct TypeImpl
 
     void *class_data;
 
-    void (*instance_init)(Object *obj);
+    void (*instance_init)(Object *obj);	// 实例构造函数
     void (*instance_post_init)(Object *obj);
     void (*instance_finalize)(Object *obj);
 
@@ -145,7 +145,7 @@ static TypeImpl *type_register_internal(const TypeInfo *info)
     TypeImpl *ti;
     ti = type_new(info);
 
-    type_table_add(ti);
+    type_table_add(ti); // 将创建的 type_impl 放到 hash table 中管理, hash key 是 name
     return ti;
 }
 
@@ -290,7 +290,7 @@ static void type_initialize(TypeImpl *ti)
         int i;
 
         g_assert_cmpint(parent->class_size, <=, ti->class_size); //父亲类型，不应该大于子类型的
-        memcpy(ti->class, parent->class, parent->class_size); //层次化来初始化所有Type的class成员。 妙妙妙。 一层一层的将祖先的class信息copy下来
+        memcpy(ti->class, parent->class, parent->class_size); //层次化来初始化所有Type的class成员。 妙妙妙。 一层一层的将祖先的class信息copy下来, 这里 copy 的 parent class 都是已经被 class_init 过了的  _核心中的核心_
         ti->class->interfaces = NULL;
         ti->class->properties = g_hash_table_new_full( // 创建了保存类属性的 hash 表
             g_str_hash, g_str_equal, g_free, object_property_free);
@@ -328,7 +328,7 @@ static void type_initialize(TypeImpl *ti)
     //注意：前面是递归的，所以所有类的class_init class_base_init函数按照先父类后子类的顺序都会被调用的
     //另外，注意这个函数刚进来的初始化条件，如果一个类被的init函数被调用过了就不会被调用的。
     while (parent) {
-        if (parent->class_base_init) {
+        if (parent->class_base_init) { // 先调用父亲，再调用父亲的父亲
             parent->class_base_init(ti->class, ti->class_data);
         }
         parent = type_get_parent(parent);
@@ -344,7 +344,7 @@ static void object_init_with_type(Object *obj, TypeImpl *ti)
 	//构造的过程是先构造祖先类，再构造子类的。这里就是递归实现的
 	//最终上溯到终极的type object
     if (type_has_parent(ti)) {
-        object_init_with_type(obj, type_get_parent(ti));
+        object_init_with_type(obj, type_get_parent(ti)); // 从最高祖先的构造函数开始一点一点的调用
     }
 
 //这里递归调用都是一个指针参数obj，但是却能一直调用到父类，显然这个obj是类似与linux sock的那种层次继承关系，我称作first-member-inherit
@@ -372,13 +372,13 @@ void object_initialize_with_type(void *data, size_t size, TypeImpl *type)
     type_initialize(type);
 
     g_assert_cmpint(type->instance_size, >=, sizeof(Object));
-    g_assert(type->abstract == false);
+    g_assert(type->abstract == false); // 抽象类不能用来实例化
     g_assert_cmpint(size, >=, type->instance_size);
 
     memset(obj, 0, type->instance_size);
     obj->class = type->class;
     object_ref(obj);
-    obj->properties = g_hash_table_new_full(g_str_hash, g_str_equal, //搞一个hash table来保存属性咯
+    obj->properties = g_hash_table_new_full(g_str_hash, g_str_equal, //搞一个hash table来保存 object 属性咯
                                             NULL, object_property_free);
     object_init_with_type(obj, type);
     object_post_init_with_type(obj, type);
@@ -486,9 +486,9 @@ Object *object_new_with_type(Type type)
     Object *obj;
 
     g_assert(type != NULL);
-    type_initialize(type);
+    type_initialize(type); // 如果对应的 type 没有被 initialize 的话，就会先 init 一下
 
-    obj = g_malloc(type->instance_size);
+    obj = g_malloc(type->instance_size); // 分配对象的内存空间
     object_initialize_with_type(obj, type->instance_size, type);
     obj->free = g_free;
 
@@ -671,7 +671,7 @@ ObjectClass *object_class_dynamic_cast(ObjectClass *class,
     }
 
     /* A simple fast path that can trigger a lot for leaf classes.  */
-    type = class->type;
+    type = class->type; // 需要被 cast 的 class 就是 typename
     if (type->name == typename) {
         return class;
     }
@@ -727,7 +727,7 @@ ObjectClass *object_class_dynamic_cast_assert(ObjectClass *class,
         }
     }
 #else
-    if (!class || !class->interfaces) {
+    if (!class || !class->interfaces) { // 如果需要被 cast 的 class 不是 interface，那么直接返回
         return class;
     }
 #endif
@@ -769,7 +769,7 @@ bool object_class_is_abstract(ObjectClass *klass)
 
 const char *object_class_get_name(ObjectClass *klass)
 {
-    return klass->type->name;
+    return klass->type->name; // type_initialize()里的 ti—>class->type = ti 的时候赋值的 klass->type
 }
 
 ObjectClass *object_class_by_name(const char *typename)

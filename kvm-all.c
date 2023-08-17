@@ -67,13 +67,13 @@ struct KVMParkedVcpu {
     QLIST_ENTRY(KVMParkedVcpu) node;
 };
 
-struct KVMState
+struct KVMState // 保存了 KVM 相关的 ctx
 {
     AccelState parent_obj;
 
     int nr_slots;
     int fd;
-    int vmfd;
+    int vmfd; // KVM_CREATE_VM 得到的 fd
     int coalesced_mmio;
     struct kvm_coalesced_mmio_ring *coalesced_mmio_ring;
     bool coalesced_flush_in_progress;
@@ -103,7 +103,7 @@ struct KVMState
     QLIST_HEAD(, KVMParkedVcpu) kvm_parked_vcpus;
 };
 
-KVMState *kvm_state;
+KVMState *kvm_state; // global 的 kvm的信息，譬如一些 fd
 bool kvm_kernel_irqchip;
 bool kvm_split_irqchip;
 bool kvm_async_interrupts_allowed;
@@ -300,7 +300,7 @@ static int kvm_get_vcpu(KVMState *s, unsigned long vcpu_id)
         }
     }
 
-    return kvm_vm_ioctl(s, KVM_CREATE_VCPU, (void *)vcpu_id);
+    return kvm_vm_ioctl(s, KVM_CREATE_VCPU, (void *)vcpu_id); // 通过 KVM 创建 VCPU, 传入参数是 cpu id。kvm 的这个接口调用非常简单的，传入一个 cpu_id，就可以了。返回的值是一个fd, mmap 这个 fd 可以拿到 kvm 和 qemu share 的信息
 }
 
 int kvm_init_vcpu(CPUState *cpu)
@@ -311,7 +311,7 @@ int kvm_init_vcpu(CPUState *cpu)
 
     DPRINTF("kvm_init_vcpu\n");
 
-    ret = kvm_get_vcpu(s, kvm_arch_vcpu_id(cpu));
+    ret = kvm_get_vcpu(s, kvm_arch_vcpu_id(cpu)); // ret 是 一个和 vcpu 相关的 fd
     if (ret < 0) {
         DPRINTF("kvm_create_vcpu failed\n");
         goto err;
@@ -329,7 +329,7 @@ int kvm_init_vcpu(CPUState *cpu)
     }
 
     cpu->kvm_run = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_SHARED,
-                        cpu->kvm_fd, 0);
+                        cpu->kvm_fd, 0); // kvm share 的 mem，和 qemu 共享一些数据
     if (cpu->kvm_run == MAP_FAILED) {
         ret = -errno;
         DPRINTF("mmap'ing vcpu state failed\n");
@@ -1584,7 +1584,7 @@ static int kvm_init(MachineState *ms)
     int type = 0;
     const char *kvm_type;
 
-    s = KVM_STATE(ms->accelerator);
+    s = KVM_STATE(ms->accelerator); // 多态，获取 KVMState
 
     /*
      * On systems where the kernel can support different base page
@@ -1599,7 +1599,7 @@ static int kvm_init(MachineState *ms)
 #ifdef KVM_CAP_SET_GUEST_DEBUG
     QTAILQ_INIT(&s->kvm_sw_breakpoints);
 #endif
-    QLIST_INIT(&s->kvm_parked_vcpus);
+    QLIST_INIT(&s->kvm_parked_vcpus); // 一个 list，用来管理 vcpu
     s->vmfd = -1;
     s->fd = qemu_open("/dev/kvm", O_RDWR); //打开kvm的接口，后续基于此与kvm交互
     if (s->fd == -1) {
@@ -1623,7 +1623,7 @@ static int kvm_init(MachineState *ms)
         goto err;
     }
 
-    s->nr_slots = kvm_check_extension(s, KVM_CAP_NR_MEMSLOTS);
+    s->nr_slots = kvm_check_extension(s, KVM_CAP_NR_MEMSLOTS); // 从 kvm 模块拿信息
 
     /* If unspecified, use the default value */
     if (!s->nr_slots) {
@@ -1651,17 +1651,17 @@ static int kvm_init(MachineState *ms)
         nc++;
     }
 
-    kvm_type = qemu_opt_get(qemu_get_machine_opts(), "kvm-type");
-    if (mc->kvm_type) {
+    kvm_type = qemu_opt_get(qemu_get_machine_opts(), "kvm-type"); // 一般没有这个选项的
+    if (mc->kvm_type) { // 一般也是空
         type = mc->kvm_type(kvm_type);
-    } else if (kvm_type) {
+    } else if (kvm_type) { // 空空如也
         ret = -EINVAL;
         fprintf(stderr, "Invalid argument kvm-type=%s\n", kvm_type);
         goto err;
     }
 
     do {
-        ret = kvm_ioctl(s, KVM_CREATE_VM, type); //准备好了，可以创建虚拟机了
+        ret = kvm_ioctl(s, KVM_CREATE_VM, type); //准备好了，可以创建虚拟机了, 返回值是一个 fd，是后续对 vm 操作的接口
     } while (ret == -EINTR);
 
     if (ret < 0) {
@@ -1685,7 +1685,7 @@ static int kvm_init(MachineState *ms)
     }
 
     s->vmfd = ret;
-    missing_cap = kvm_check_extension_list(s, kvm_required_capabilites);
+    missing_cap = kvm_check_extension_list(s, kvm_required_capabilites); // 各个 cap 的 check
     if (!missing_cap) {
         missing_cap =
             kvm_check_extension_list(s, kvm_arch_required_capabilities);
@@ -1747,13 +1747,13 @@ static int kvm_init(MachineState *ms)
     kvm_ioeventfd_any_length_allowed =
         (kvm_check_extension(s, KVM_CAP_IOEVENTFD_ANY_LENGTH) > 0);
 
-    ret = kvm_arch_init(ms, s);
+    ret = kvm_arch_init(ms, s); // arch 相关的init
     if (ret < 0) {
         goto err;
     }
 
     if (machine_kernel_irqchip_allowed(ms)) {
-        kvm_irqchip_create(ms, s);
+        kvm_irqchip_create(ms, s); // 基于 kvm 来模拟 irqchip
     }
 
     kvm_state = s; //最后将s保存起来
@@ -1765,7 +1765,7 @@ static int kvm_init(MachineState *ms)
     s->memory_listener.listener.coalesced_mmio_add = kvm_coalesce_mmio_region;
     s->memory_listener.listener.coalesced_mmio_del = kvm_uncoalesce_mmio_region;
 
-    kvm_memory_listener_register(s, &s->memory_listener,
+    kvm_memory_listener_register(s, &s->memory_listener, // qemu 内存虚拟化相关
                                  &address_space_memory, 0);
     memory_listener_register(&kvm_io_listener,
                              &address_space_io);
@@ -1911,7 +1911,7 @@ int kvm_cpu_exec(CPUState *cpu)
 
     qemu_mutex_unlock_iothread();
 
-    do {
+    do { // vcpu 主循环, 不停的 通过 KVM 执行 VMENTRY, 一旦发生了 VMEXIT，就做io处理。一般是把事情分发给对应的 io 线程
         MemTxAttrs attrs;
 
         if (cpu->kvm_vcpu_dirty) {
@@ -2043,7 +2043,7 @@ int kvm_ioctl(KVMState *s, int type, ...)
     va_list ap;
 
     va_start(ap, type);
-    arg = va_arg(ap, void *);
+    arg = va_arg(ap, void *); // 只会拿第一个参数, 将其强制转换为 void *
     va_end(ap);
 
     trace_kvm_ioctl(type, arg);
@@ -2476,7 +2476,7 @@ static void kvm_accel_class_init(ObjectClass *oc, void *data)
     AccelClass *ac = ACCEL_CLASS(oc);
     ac->name = "KVM";
     ac->init_machine = kvm_init;
-    ac->allowed = &kvm_allowed;
+    ac->allowed = &kvm_allowed; // refer to: %accel_init_machine()
 }
 
 static const TypeInfo kvm_accel_type = {

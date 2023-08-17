@@ -2426,14 +2426,14 @@ static int mon_init_func(void *opaque, QemuOpts *opts, Error **errp)
         error_report("option 'default' does nothing and is deprecated");
     }
 
-    chardev = qemu_opt_get(opts, "chardev");
+    chardev = qemu_opt_get(opts, "chardev"); // 在 opts 这个选项里，寻找有没有一个 chardev 的属性值
     chr = qemu_chr_find(chardev);
     if (chr == NULL) {
         error_report("chardev \"%s\" not found", chardev);
         exit(1);
     }
 
-    monitor_init(chr, flags);
+    monitor_init(chr, flags); // 这里是核心
     return 0;
 }
 
@@ -2792,7 +2792,7 @@ static MachineClass *select_machine(void)
     opts = qemu_get_machine_opts();
     qemu_opts_loc_restore(opts);
 
-    optarg = qemu_opt_get(opts, "type");
+    optarg = qemu_opt_get(opts, "type"); // 在 machine opts 找到 type 这一项
     if (optarg) {
         machine_class = machine_parse(optarg);
     }
@@ -3276,7 +3276,7 @@ int main(int argc, char **argv, char **envp)
                 break;
             case QEMU_OPTION_nographic:
                 olist = qemu_find_opts("machine");
-                qemu_opts_parse_noisily(olist, "graphics=off", false);
+                qemu_opts_parse_noisily(olist, "graphics=off", false); //都在不停的 给 machine opts 添砖加瓦
                 nographic = true;
                 display_type = DT_NONE;
                 break;
@@ -3500,7 +3500,7 @@ int main(int argc, char **argv, char **envp)
                 }
                 break;
             case QEMU_OPTION_qmp:
-                monitor_parse(optarg, "control", false);
+                monitor_parse(optarg, "control", false); // 这里也仅仅是把参数设置好了，还没有什么实际操作的。
                 default_monitor = 0;
                 break;
             case QEMU_OPTION_qmp_pretty:
@@ -3723,7 +3723,7 @@ int main(int argc, char **argv, char **envp)
                 break;
             case QEMU_OPTION_enable_kvm:
                 olist = qemu_find_opts("machine");
-                qemu_opts_parse_noisily(olist, "accel=kvm", false);
+                qemu_opts_parse_noisily(olist, "accel=kvm", false); // refer to: configure_accelerator(current_machine)
                 break;
             case QEMU_OPTION_M:
             case QEMU_OPTION_machine:
@@ -4096,12 +4096,12 @@ int main(int argc, char **argv, char **envp)
     }
 #endif
 
-    current_machine = MACHINE(object_new(object_class_get_name(
+    current_machine = MACHINE(object_new(object_class_get_name( // 创建对象，创建出来的对象，肯定是 MachineClass 的子类的对象
                           OBJECT_CLASS(machine_class))));
     if (machine_help_func(qemu_get_machine_opts(), current_machine)) {
         exit(0);
     }
-    object_property_add_child(object_get_root(), "machine",
+    object_property_add_child(object_get_root(), "machine", // 给 root 增加一个 child，名字是 machine，value 是 current_machine
                               OBJECT(current_machine), &error_abort);
 
     if (machine_class->minimum_page_bits) {
@@ -4546,7 +4546,7 @@ int main(int argc, char **argv, char **envp)
     current_machine->boot_order = boot_order;
     current_machine->cpu_model = cpu_model;
 
-    machine_class->init(current_machine);
+    machine_class->init(current_machine); // 核心 %pc_init1
 
     realtime_init();
 

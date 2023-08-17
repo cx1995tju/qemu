@@ -949,7 +949,7 @@ bool e820_get_entry(int, uint32_t, uint64_t *, uint64_t *);
     { \
         type_register(&pc_machine_type_##suffix); \
     } \
-    type_init(pc_machine_init_##suffix)
+    type_init(pc_machine_init_##suffix) // 注册了一个 machine 类型到 qom 中, 其 parent 是 TYPE_PC_MACHINE / pc_machine_info
 
 extern void igd_passthrough_isa_bridge_create(PCIBus *bus, uint16_t gpu_dev_id);
 #endif

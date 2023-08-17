@@ -973,6 +973,7 @@ typedef enum TPRAccess {
 } TPRAccess;
 
 //各种X86 CPU的结构，譬如：各种寄存器
+// 非常硬件相关的结构了
 typedef struct CPUX86State {
     /* standard registers */
     target_ulong regs[CPU_NB_REGS];
@@ -994,7 +995,7 @@ typedef struct CPUX86State {
     /* segments */
     SegmentCache segs[6]; /* selector values */
     SegmentCache ldt;
-    SegmentCache tr;
+    SegmentCache tr; // 指向当前 task 的 TSS 段
     SegmentCache gdt; /* only base and limit are used */
     SegmentCache idt; /* only base and limit are used */
 
@@ -1136,7 +1137,7 @@ typedef struct CPUX86State {
     uint32_t cpuid_vendor2;
     uint32_t cpuid_vendor3;
     uint32_t cpuid_version;
-    FeatureWordArray features;
+    FeatureWordArray features; // x86_cpu_load_features
     uint32_t cpuid_model[12];
 
     /* MTRRs */

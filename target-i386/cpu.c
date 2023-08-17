@@ -730,6 +730,7 @@ struct X86CPUDefinition {
     char model_id[48];
 };
 
+// QEMU 支持的各种 x86 CPU 类型
 static X86CPUDefinition builtin_x86_defs[] = {
     {
         .name = "qemu64",
@@ -1987,6 +1988,14 @@ static const char *x86_cpu_feature_name(FeatureWord w, int bitnr)
  * where +-feat overwrites any feature set by
  * feat=on|feat even if the later is parsed after +-feat
  * (i.e. "-x2apic,x2apic=on" will result in x2apic disabled)
+ *
+ * -cpu model,+feature,-feature,feature=foo 参数
+ *
+ *  - 对于 +feature 的 feature 都会加入 plus_feature
+ *  - 对于 -feature 的 feature 都会加入 minus_feature
+ *  - 对于 feature=foo 类型，会使用qdev_prop_register_global() 将其加入到 global_props
+ *  后续 realize 的时候，会将其设置为 true / false
+ *
  */
 static GList *plus_features, *minus_features;
 
@@ -2394,7 +2403,7 @@ static void x86_register_cpudef_type(X86CPUDefinition *def)
     char *typename = x86_cpu_type_name(def->name);
     TypeInfo ti = {
         .name = typename,
-        .parent = TYPE_X86_CPU,
+        .parent = TYPE_X86_CPU, // 这些 qom type 的父类都是 这个, 都没有对应的实例结构
         .class_init = x86_cpu_cpudef_class_init,
         .class_data = def,
     };
@@ -2992,7 +3001,7 @@ static void x86_cpu_apic_create(X86CPU *cpu, Error **errp)
 
     cpu->apic_state = DEVICE(object_new(object_class_get_name(apic_class)));
 
-    object_property_add_child(OBJECT(cpu), "lapic",
+    object_property_add_child(OBJECT(cpu), "lapic", // lapic 作为 cpu 的一个 child
                               OBJECT(cpu->apic_state), &error_abort);
     object_unref(OBJECT(cpu->apic_state));
 
@@ -3212,9 +3221,22 @@ out:
 #define IS_AMD_CPU(env) ((env)->cpuid_vendor1 == CPUID_VENDOR_AMD_1 && \
                          (env)->cpuid_vendor2 == CPUID_VENDOR_AMD_2 && \
                          (env)->cpuid_vendor3 == CPUID_VENDOR_AMD_3)
-static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
+// 每个 cpu 都要来 realize 一下,
+// 不是每个 core，每个超线程一次
+// 创建 cpu 的时候也是主线程一次创建一个
+// 是主线程 machine_init 的时候 realize 的
+/* x86_cpu_realizefn */
+/* device_set_realized */
+/* property_set_bool */
+/* object_property_set_qobject */
+/* object_property_set_bool */
+/* pc_new_cpu */
+/* pc_cpus_init */
+/* pc_init1 */
+/* main */
+static void x86_cpu_realizefn(DeviceState *dev, Error **errp) //refer to: pc_new_cpu()
 {
-    CPUState *cs = CPU(dev);
+    CPUState *cs = CPU(dev); // 多态
     X86CPU *cpu = X86_CPU(dev);
     X86CPUClass *xcc = X86_CPU_GET_CLASS(dev);
     CPUX86State *env = &cpu->env;
@@ -3374,7 +3396,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
     }
 #endif
 
-    qemu_init_vcpu(cs); //根据QEMU使用的加速器来执行对应的CPU的初始化函数, %qemu_kvm_start_vcpu
+    qemu_init_vcpu(cs); //根据QEMU使用的加速器来执行对应的CPU的初始化函数, %qemu_kvm_start_vcpu。启动了 vcpu 线程
 
     /* Only Intel CPUs support hyperthreading. Even though QEMU fixes this
      * issue by adjusting CPUID_0000_0001_EBX and CPUID_8000_0008_ECX
@@ -3390,13 +3412,13 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
         ht_warned = true;
     }
 
-    x86_cpu_apic_realize(cpu, &local_err); //具现化 lapic
+    x86_cpu_apic_realize(cpu, &local_err); //realize lapic
     if (local_err != NULL) {
         goto out;
     }
     cpu_reset(cs); //进行cpu reset, %x86_cpu_reset
 
-    xcc->parent_realize(dev, &local_err); //最后调用父亲的realize函数，cpu_common_realizefn
+    xcc->parent_realize(dev, &local_err); //最后调用曾经保存过的父亲的realize函数，cpu_common_realizefn, refer to: x86_cpu_common_class_init 
 
 out:
     if (local_err != NULL) {
@@ -3755,7 +3777,7 @@ static const TypeInfo x86_cpu_type_info = {
     .instance_init = x86_cpu_initfn,
     .abstract = true,
     .class_size = sizeof(X86CPUClass),
-    .class_init = x86_cpu_common_class_init,
+    .class_init = x86_cpu_common_class_init, // 这里设置的 realize 函数是关键, 会去创建 vcpu 线程
 };
 
 static void x86_cpu_register_types(void)
@@ -3764,7 +3786,7 @@ static void x86_cpu_register_types(void)
 
     type_register_static(&x86_cpu_type_info);
     for (i = 0; i < ARRAY_SIZE(builtin_x86_defs); i++) {
-        x86_register_cpudef_type(&builtin_x86_defs[i]);
+        x86_register_cpudef_type(&builtin_x86_defs[i]); // 根据这个 builtin 数组，注册了一堆 关于 cpu 的 QOM Type
     }
 #ifdef CONFIG_KVM
     type_register_static(&host_x86_cpu_type_info);

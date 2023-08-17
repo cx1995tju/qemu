@@ -38,7 +38,7 @@
 #define DMA_SIZE        4096
 
 typedef struct {
-    PCIDevice pdev; // 对象之间的层次关系，first-member inherit
+    PCIDevice pdev; // 对象之间的层次关系，first-member inherit, 第一个成员必须是 parent 
     MemoryRegion mmio;
 
     QemuThread thread;

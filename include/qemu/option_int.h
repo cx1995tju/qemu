@@ -29,26 +29,40 @@
 #include "qemu/option.h"
 #include "qemu/error-report.h"
 
+// 一个选项 QemuOpts 有很多属性的，每个属性(或者说小选项，被组织为该结构)
 struct QemuOpt {
-    char *name;
-    char *str;
+    char *name; // 属性名
+    char *str; // 属性值
 
     const QemuOptDesc *desc;
     union {
         bool boolean;
         uint64_t uint;
-    } value;
+    } value; // 属性值
 
-    QemuOpts     *opts;
-    QTAILQ_ENTRY(QemuOpt) next;
+    QemuOpts     *opts; // 指向 parent
+    QTAILQ_ENTRY(QemuOpt) next; // link 到下一个属性
 };
 
+// 每个类型(QemuOptsList)的选项都可能有多个的，那么每个选项实例有一个 id 的
 struct QemuOpts {
     char *id;
-    QemuOptsList *list;
+    QemuOptsList *list; // 指向parent
     Location loc;
     QTAILQ_HEAD(QemuOptHead, QemuOpt) head;
     QTAILQ_ENTRY(QemuOpts) next;
 };
+
+/* QemuOptsList 表示某个类型的选项，一共有 48 种，被组织在全局数组 vm_config_groups 中
+ *	- 在 main 函数开头位置，通过 qemu_add_opts 填充 vm_config_groups 数组的
+ *	- QemuOptsList 将所有该类型的选项 (QemuOpts) 组织到一个 list 中，每个 node 表示一个选项实例
+ *
+ * QemuOpts:
+ *      - 某个类型的一个具体选项
+ *      - 显然一个选项有很多属性值的，这些属性值被组织为一个 list，通过 QemuOpts 索引
+ *
+ * QemuOpt:
+ *	- 表示某个选项的一个属性值: name + value(str, bool. int)
+ * */
 
 #endif

@@ -1098,7 +1098,7 @@ static X86CPU *pc_new_cpu(const char *typename, int64_t apic_id,
     cpu = X86_CPU(object_new(typename));
 
     object_property_set_int(OBJECT(cpu), apic_id, "apic-id", &local_err);
-    object_property_set_bool(OBJECT(cpu), true, "realized", &local_err); //realize it???
+    object_property_set_bool(OBJECT(cpu), true, "realized", &local_err); //realize it
 
     if (local_err) {
         error_propagate(errp, local_err);

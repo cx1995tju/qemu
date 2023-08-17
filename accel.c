@@ -53,13 +53,13 @@ static const TypeInfo accel_type = {
 /* Lookup AccelClass from opt_name. Returns NULL if not found */
 static AccelClass *accel_find(const char *opt_name)
 {
-    char *class_name = g_strdup_printf(ACCEL_CLASS_NAME("%s"), opt_name);
+    char *class_name = g_strdup_printf(ACCEL_CLASS_NAME("%s"), opt_name);  // calss_name is kvm-accel / TYPE_KVM_ACCEL  kvm_accel_type
     AccelClass *ac = ACCEL_CLASS(object_class_by_name(class_name));
     g_free(class_name);
     return ac;
 }
 
-static int accel_init_machine(AccelClass *acc, MachineState *ms)
+static int accel_init_machine(AccelClass *acc, MachineState *ms) // 多态
 {
     ObjectClass *oc = OBJECT_CLASS(acc);
     const char *cname = object_class_get_name(oc);
@@ -67,7 +67,7 @@ static int accel_init_machine(AccelClass *acc, MachineState *ms)
     int ret;
     ms->accelerator = accel;
     *(acc->allowed) = true;
-    ret = acc->init_machine(ms); //%kvm-all.c:kvm_init, 具体是什么，取决于具体的accelrator, 在TYPE_KVM_ACCEL的类初始化函数中设置的
+    ret = acc->init_machine(ms); //%kvm-all.c:kvm_init, 具体是什么，取决于具体的accelrator, 在TYPE_KVM_ACCEL的类初始化函数中设置的, refer to: kvm_accel_class_init
     if (ret < 0) {
         ms->accelerator = NULL;
         *(acc->allowed) = false;
@@ -85,7 +85,7 @@ void configure_accelerator(MachineState *ms)
     bool init_failed = false;
     AccelClass *acc = NULL;
 
-    p = qemu_opt_get(qemu_get_machine_opts(), "accel");
+    p = qemu_opt_get(qemu_get_machine_opts(), "accel"); // 譬如: accel=kvm, refer to: --enable-kvm 选项, 返回的是属性值，即 kvm
     if (p == NULL) {
         /* Use the default "accelerator", tcg */
         p = "tcg";
@@ -95,7 +95,7 @@ void configure_accelerator(MachineState *ms)
         if (*p == ':') {
             p++;
         }
-        p = get_opt_name(buf, sizeof(buf), p, ':');
+        p = get_opt_name(buf, sizeof(buf), p, ':'); // p is NULL, buf is kvm
         acc = accel_find(buf);
         if (!acc) {
             fprintf(stderr, "\"%s\" accelerator not found.\n", buf);

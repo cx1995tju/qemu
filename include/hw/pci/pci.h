@@ -201,7 +201,7 @@ typedef struct PCIINTxRoute {
 } PCIINTxRoute;
 
 typedef struct PCIDeviceClass {
-    DeviceClass parent_class;
+    DeviceClass parent_class; // 必须是 first-member
 
     void (*realize)(PCIDevice *dev, Error **errp);
     int (*init)(PCIDevice *dev);/* TODO convert to realize() and remove */

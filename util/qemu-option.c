@@ -46,6 +46,8 @@
  * The return value is the position of the delimiter/zero byte after the option
  * name in p.
  */
+// 返回值是 delim 的位置
+// buf 中保存的是 option name
 const char *get_opt_name(char *buf, int buf_size, const char *p, char delim)
 {
     char *q;
@@ -329,7 +331,7 @@ const char *qemu_opt_get(QemuOpts *opts, const char *name)
             return desc->def_value_str;
         }
     }
-    return opt ? opt->str : NULL;
+    return opt ? opt->str : NULL; // 返回的是选项的name，不是 value
 }
 
 /* Get a known option (or its default) and remove it from the list

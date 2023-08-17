@@ -995,7 +995,7 @@ static void *qemu_kvm_cpu_thread_fn(void *arg)
     cpu->created = true;
     qemu_cond_signal(&qemu_cpu_cond);
 
-    do {
+    do { // vcpu 主循环
         if (cpu_can_run(cpu)) { //判断cpu能否运行
             r = kvm_cpu_exec(cpu); //运行CPU， 进入KVM侧
             if (r == EXCP_DEBUG) {
@@ -1431,7 +1431,7 @@ static void qemu_kvm_start_vcpu(CPUState *cpu)
              cpu->cpu_index);
     qemu_thread_create(cpu->thread, thread_name, qemu_kvm_cpu_thread_fn,
                        cpu, QEMU_THREAD_JOINABLE); //为每个cpu对象创建一个线程, 线程名字CPU %d/KVM
-    while (!cpu->created) {
+    while (!cpu->created) { // vcpu 线程 run 起来后，会设置这个变量; 同时会 signal qemu_cpu_cond
         qemu_cond_wait(&qemu_cpu_cond, &qemu_global_mutex);
     }
 }

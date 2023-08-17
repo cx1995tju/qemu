@@ -882,6 +882,8 @@ static bool device_get_realized(Object *obj, Error **errp)
     return dev->realized;
 }
 
+// 设置 realize 属性的时候，会执行 realize 函数
+// 调用 object_property_add_bool(obj, "realized", 设置realize 属性的时候，就是执行这个 set 函数，然后就会执行 ->realize() callback
 static void device_set_realized(Object *obj, bool value, Error **errp)
 {
     DeviceState *dev = DEVICE(obj);
@@ -1036,7 +1038,7 @@ static void device_initfn(Object *obj)
     dev->instance_id_alias = -1;
     dev->realized = false;
 
-    object_property_add_bool(obj, "realized",
+    object_property_add_bool(obj, "realized", // 关键，device 类型都有这个 realize 属性，会执行一个 realize 函数. callback 函数在 DeviceClass 结构中
                              device_get_realized, device_set_realized, NULL);
     object_property_add_bool(obj, "hotpluggable",
                              device_get_hotpluggable, NULL, NULL);
@@ -1159,6 +1161,7 @@ Object *qdev_get_machine(void)
     return dev;
 }
 
+// 重要 type，一切都是 device，而这就是 device 的基类
 static const TypeInfo device_type_info = {
     .name = TYPE_DEVICE,
     .parent = TYPE_OBJECT,
@@ -1168,7 +1171,7 @@ static const TypeInfo device_type_info = {
     .instance_finalize = device_finalize,
     .class_base_init = device_class_base_init,
     .class_init = device_class_init,
-    .abstract = true,
+    .abstract = true, // 抽象类
     .class_size = sizeof(DeviceClass),
 };
 

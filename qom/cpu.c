@@ -383,9 +383,28 @@ static int64_t cpu_common_get_arch_id(CPUState *cpu)
     return cpu->cpu_index;
 }
 
+
+//+-------------+------------------------     <- klass
+//| ObjectClass |     ^           ^
+//|             |     |           |
+//+-------------- DeviceClass     |
+//| DeviceClass |     |           |
+//| Private     |     v         CPUClass
+//+--------------------------     |
+//| CPUClass    |                 |
+//|             |                 |
+//| Private     |                 v
+//+---------------------------------------
+/* 如上图所示，当 kclass 指向开头位置的时候，这个指针即可以表示 DeviceClass 类型，也可以标识 CPUClass 类型
+ *
+ * 本质就是实现了多态
+ * */
+
+
+// 函数本身很简单，就是实现各种回调函数
 static void cpu_class_init(ObjectClass *klass, void *data)
 {
-    DeviceClass *dc = DEVICE_CLASS(klass);
+    DeviceClass *dc = DEVICE_CLASS(klass); // dc 和 k 指针是一样的，只是类型不同, 多态咯
     CPUClass *k = CPU_CLASS(klass);
 
     k->class_by_name = cpu_common_class_by_name;
@@ -407,7 +426,7 @@ static void cpu_class_init(ObjectClass *klass, void *data)
     k->cpu_exec_enter = cpu_common_noop;
     k->cpu_exec_exit = cpu_common_noop;
     k->cpu_exec_interrupt = cpu_common_exec_interrupt;
-    dc->realize = cpu_common_realizefn;
+    dc->realize = cpu_common_realizefn; // 这里稍微要注意下，修改了 父类的 realize 函数
     dc->unrealize = cpu_common_unrealizefn;
     /*
      * Reason: CPUs still need special care by board code: wiring up
@@ -420,7 +439,7 @@ static const TypeInfo cpu_type_info = {
     .name = TYPE_CPU,
     .parent = TYPE_DEVICE,
     .instance_size = sizeof(CPUState),
-    .instance_init = cpu_common_initfn,
+    .instance_init = cpu_common_initfn, // 这个父类做的事情比较简单，更多工作，refer to： TYPE_X86_CPU
     .instance_finalize = cpu_common_finalize,
     .abstract = true,
     .class_size = sizeof(CPUClass),
