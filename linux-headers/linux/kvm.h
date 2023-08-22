@@ -96,9 +96,9 @@ struct kvm_memory_region {
 struct kvm_userspace_memory_region {
 	__u32 slot;
 	__u32 flags;
-	__u64 guest_phys_addr;
+	__u64 guest_phys_addr; // GPA
 	__u64 memory_size; /* bytes */
-	__u64 userspace_addr; /* start of the userspace allocated memory */
+	__u64 userspace_addr; /* start of the userspace allocated memory */ HVA
 };
 
 /*

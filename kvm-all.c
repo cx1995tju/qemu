@@ -253,7 +253,7 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot)
         kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &mem);
     }
     mem.memory_size = slot->memory_size;
-    return kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &mem);
+    return kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &mem); // 告诉kvm 建立 GPA 和 HVA 的关系
 }
 
 int kvm_destroy_vcpu(CPUState *cpu)
@@ -694,6 +694,7 @@ kvm_check_extension_list(KVMState *s, const KVMCapabilityInfo *list)
     return NULL;
 }
 
+ // section 记录了这一次 内存变化的信息
 static void kvm_set_phys_mem(KVMMemoryListener *kml,
                              MemoryRegionSection *section, bool add)
 {
@@ -732,7 +733,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
         }
     }
 
-    ram = memory_region_get_ram_ptr(mr) + section->offset_within_region + delta; //对应的qemu的虚拟地址
+    ram = memory_region_get_ram_ptr(mr) + section->offset_within_region + delta; //对应的qemu的虚拟地址, HVA
 
     while (1) {
         mem = kvm_lookup_overlapping_slot(kml, start_addr, start_addr + size);
@@ -855,7 +856,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
     }
 }
 
-static void kvm_region_add(MemoryListener *listener,
+static void kvm_region_add(MemoryListener *listener, // section 记录了这一次 内存变化的信息
                            MemoryRegionSection *section)
 {
     KVMMemoryListener *kml = container_of(listener, KVMMemoryListener, listener);
@@ -1765,9 +1766,9 @@ static int kvm_init(MachineState *ms)
     s->memory_listener.listener.coalesced_mmio_add = kvm_coalesce_mmio_region;
     s->memory_listener.listener.coalesced_mmio_del = kvm_uncoalesce_mmio_region;
 
-    kvm_memory_listener_register(s, &s->memory_listener, // qemu 内存虚拟化相关
+    kvm_memory_listener_register(s, &s->memory_listener, // qemu 内存虚拟化相关, 注册一个 listern 到 address_space_memory 中，这个listern 负责监听内存布局的变化，并通知到 kvm
                                  &address_space_memory, 0);
-    memory_listener_register(&kvm_io_listener,
+    memory_listener_register(&kvm_io_listener,	// 这个 listern 用来家庭 address_space_io space 的
                              &address_space_io);
 
     s->many_ioeventfds = kvm_check_many_ioeventfds();
@@ -2079,7 +2080,7 @@ int kvm_vcpu_ioctl(CPUState *cpu, int type, ...)
     va_list ap;
 
     va_start(ap, type);
-    arg = va_arg(ap, void *);
+    arg = va_arg(ap, void *); // arg 是 NULL
     va_end(ap);
 
     trace_kvm_vcpu_ioctl(cpu->cpu_index, type, arg);

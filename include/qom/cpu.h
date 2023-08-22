@@ -323,7 +323,7 @@ struct CPUState { //存储一些CPU相关的通用信息，参考 %X86CPU
     bool unplug;
     bool crash_occurred;
     bool exit_request;
-    uint32_t interrupt_request;
+    uint32_t interrupt_request; // %CPU_INTERRUPT_NMI, 表示有哪些中断请求，需要注入的
     int singlestep_enabled;
     int64_t icount_extra;
     sigjmp_buf jmp_env;

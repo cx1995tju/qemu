@@ -2422,10 +2422,12 @@ void cpu_clear_apic_feature(CPUX86State *env)
 #endif /* !CONFIG_USER_ONLY */
 
 //env是X86CPU的env成员
-//index是CPUID的主功能号
-//count是子功能号
+//index是CPUID的主功能号, 即 CPUID 指令的 eax 参数
+//count是子功能号, 即 CPUID 指令的 ecx 参数
 //4个寄存器用于返回CPUID的数据，QEMU获得后，将其保存struct cpuid_data，最后传递给KVM
 //说到底：CPUID的数据就是来自于env咯
+//
+// 根据 env 中的信息，构造一项 cpuid 指令的返回值
 void cpu_x86_cpuid(CPUX86State *env, uint32_t index, uint32_t count,
                    uint32_t *eax, uint32_t *ebx,
                    uint32_t *ecx, uint32_t *edx)
@@ -2877,7 +2879,7 @@ static void x86_cpu_reset(CPUState *s)
                            DESC_P_MASK | DESC_S_MASK | DESC_W_MASK |
                            DESC_A_MASK);
 
-    env->eip = 0xfff0;
+    env->eip = 0xfff0; // cpu reset 后的值就是这个
     env->regs[R_EDX] = env->cpuid_version;
 
     env->eflags = 0x2;

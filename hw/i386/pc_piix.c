@@ -66,7 +66,7 @@ static void pc_init1(MachineState *machine,
                      const char *host_type, const char *pci_type)
 {
 	//pcms 显然是machine的子类的对象
-    PCMachineState *pcms = PC_MACHINE(machine);
+    PCMachineState *pcms = PC_MACHINE(machine); // TYPE_PC_MACHINE
     PCMachineClass *pcmc = PC_MACHINE_GET_CLASS(pcms);
     MemoryRegion *system_memory = get_system_memory();
     MemoryRegion *system_io = get_system_io();

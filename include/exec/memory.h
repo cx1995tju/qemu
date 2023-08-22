@@ -280,7 +280,7 @@ struct AddressSpace {
     /* All fields are private. */
     struct rcu_head rcu;
     char *name;
-    MemoryRegion *root; //该addressspace 对应的根MemoryRegion
+    MemoryRegion *root; //该 AddressSpace 对应的根MemoryRegion
     int ref_count;
     bool malloced;
 

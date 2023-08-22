@@ -939,7 +939,7 @@ object_property_add(Object *obj, const char *name, const char *type,
         for (i = 0; ; ++i) {
             char *full_name = g_strdup_printf("%s[%d]", name_no_array, i);
 
-            ret = object_property_add(obj, full_name, type, get, set,
+            ret = object_property_add(obj, full_name, type, get, set, // 截断了？？？
                                       release, opaque, NULL);
             g_free(full_name);
             if (ret) {

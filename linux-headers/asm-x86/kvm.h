@@ -189,6 +189,8 @@ struct kvm_msr_list {
 };
 
 
+// CPUID 指令，参数是 隐式的 eax / ecx
+// 返回值会保存在 e[abcd]x 中
 struct kvm_cpuid_entry {
 	__u32 function;
 	__u32 eax;
@@ -224,7 +226,7 @@ struct kvm_cpuid_entry2 {
 struct kvm_cpuid2 {
 	__u32 nent; //entries的数目
 	__u32 padding;
-	struct kvm_cpuid_entry2 entries[0]; //每个entries表示一项CPUID数据
+	struct kvm_cpuid_entry2 entries[0]; //每个entries表示一项CPUID数据, 注意这里是 0 长数组
 };
 
 /* for KVM_GET_PIT and KVM_SET_PIT */

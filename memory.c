@@ -226,7 +226,7 @@ struct FlatRange {
 struct FlatView {
     struct rcu_head rcu;
     unsigned ref;
-    FlatRange *ranges; //MemoryRegion展开后的平坦视图下，内存拓扑由FlagRange表示
+    FlatRange *ranges; //MemoryRegion展开后的平坦视图下，内存拓扑由FlagRange表示, 一个数组
     unsigned nr; //表示FlagRange的数目
     unsigned nr_allocated; //已经分配的FlatRange数目
 };
@@ -818,7 +818,7 @@ static void address_space_update_ioeventfds(AddressSpace *as)
 //会便利old_view 和 new_view的FlatRange, 有4种情况：
 //1. FlatRange在old view中，而不是新的，那么删除老的FlatView
 //2. FlatRange在old view中，也在new view中，但是其属性变化了，那么删除old view
-//3. 如果同时都在，adding为 true，同时只是dirt_log_mask,那么相应的取消和开始log
+//3. 如果同时都在，adding为 true，同时只是dirt_log_mask,那么相应的取消和开始log。这个 log 的意思是记录内存的访问情况
 //4. 如果只在new_view中，并且是添加的，则调用相应的add函数
 static void address_space_update_topology_pass(AddressSpace *as,
                                                const FlatView *old_view,
@@ -879,7 +879,7 @@ static void address_space_update_topology_pass(AddressSpace *as,
             /* In new */
 
             if (adding) {
-                MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, region_add); //%kvm_region_add
+                MEMORY_LISTENER_UPDATE_REGION(frnew, as, Forward, region_add); //%kvm_region_add, call 各种了 listener 的 add cb
             }
 
             ++inew;
@@ -995,7 +995,7 @@ void memory_region_init(MemoryRegion *mr,
                         const char *name,
                         uint64_t size)
 {
-    object_initialize(mr, sizeof(*mr), TYPE_MEMORY_REGION);
+    object_initialize(mr, sizeof(*mr), TYPE_MEMORY_REGION); // %memory_region_initfn
     mr->size = int128_make64(size);
     if (size == UINT64_MAX) {
         mr->size = int128_2_64();
@@ -1358,7 +1358,7 @@ void memory_region_init_io(MemoryRegion *mr,
                            uint64_t size)
 {
     memory_region_init(mr, owner, name, size);
-    mr->ops = ops ? ops : &unassigned_mem_ops;
+    mr->ops = ops ? ops : &unassigned_mem_ops; // 关键，处理对于这个 mr 的读写操作
     mr->opaque = opaque; //关键中的关键，是建立memory region与某个具体结构的关系关键，譬如：表示某个具体的设备结构
     mr->terminates = true;
 }
@@ -2341,6 +2341,7 @@ static void listener_add_address_space(MemoryListener *listener,
 }
 
 //将listener注册到as地址空间中，as地址空间拓扑结构发生变化的时候会通知
+//这些 listener 是按照 priority 来插入的，priority 值小的在 list 前面
 void memory_listener_register(MemoryListener *listener, AddressSpace *as)
 {
     MemoryListener *other = NULL;
@@ -2393,7 +2394,7 @@ void address_space_init(AddressSpace *as, MemoryRegion *root, const char *name)
     as->ioeventfd_nb = 0;
     as->ioeventfds = NULL;
     QTAILQ_INIT(&as->listeners);
-    QTAILQ_INSERT_TAIL(&address_spaces, as, address_spaces_link);
+    QTAILQ_INSERT_TAIL(&address_spaces, as, address_spaces_link); // 所有的 as 都link 到一个全局变量中
     as->name = g_strdup(name ? name : "anonymous");
     address_space_init_dispatch(as);
     memory_region_update_pending |= root->enabled;

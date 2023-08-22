@@ -1389,8 +1389,8 @@ void pc_memory_init(PCMachineState *pcms,
     *ram_memory = ram;
     ram_below_4g = g_malloc(sizeof(*ram_below_4g));
     memory_region_init_alias(ram_below_4g, NULL, "ram-below-4g", ram, //创建below 4g的内存的memory region，并作为subregion，加入到system_memory中管理
-                             0, pcms->below_4g_mem_size);
-    memory_region_add_subregion(system_memory, 0, ram_below_4g);
+                             0, pcms->below_4g_mem_size); // ram_below_4g 是 ram 的alias
+    memory_region_add_subregion(system_memory, 0, ram_below_4g); // 这个 alias 同时是 system_memory 的 subregion
     e820_add_entry(0, pcms->below_4g_mem_size, E820_RAM); //小于4G的内存还要加入e820表中，供bios使用
     if (pcms->above_4g_mem_size > 0) {
         ram_above_4g = g_malloc(sizeof(*ram_above_4g)); //建立above 4g的region

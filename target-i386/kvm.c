@@ -688,6 +688,8 @@ static Error *invtsc_mig_blocker;
 
 #define KVM_MAX_CPUID_ENTRIES  100
 
+//主要工作就是构造虚拟机vCPU的CPUID，这样虚拟机才能获取诸如架构，型号，厂商等信息
+//然后调用ioctl将CPUID的信息给KVM，这样当虚拟机执行敏感指令CPUID的时候会VM-Exit，KVM就将QEMU构造的CPUID数据给虚拟机
 int kvm_arch_init_vcpu(CPUState *cs)
 {
     struct {
@@ -707,8 +709,6 @@ int kvm_arch_init_vcpu(CPUState *cs)
 
     cpuid_i = 0;
 
-    //主要工作就是构造虚拟机vCPU的CPUID，这样虚拟机才能获取诸如架构，型号，厂商等信息
-    //然后调用ioctl将CPUID的信息给KVM，这样当虚拟机执行敏感指令CPUID的时候会VM-Exit，KVM就将QEMU构造的CPUID数据给虚拟机
     /* Paravirtualization CPUIDs */
     if (hyperv_enabled(cpu)) {
         c = &cpuid_data.entries[cpuid_i++];
@@ -789,9 +789,9 @@ int kvm_arch_init_vcpu(CPUState *cs)
     }
 
     //获取基础功能的最大功能号, 保存在limit中，然后一项一项获取
-    cpu_x86_cpuid(env, 0, 0, &limit, &unused, &unused, &unused);
+    cpu_x86_cpuid(env, 0, 0, &limit, &unused, &unused, &unused); // 获取对应的 CPUID 指令的返回值, 然后将其组织到 cpuid_data , 最后将其注册到 kvm
 
-    for (i = 0; i <= limit; i++) {
+    for (i = 0; i <= limit; i++) { // i 是主功能号的最大值，一个一个，case by case 的处理
         if (cpuid_i == KVM_MAX_CPUID_ENTRIES) {
             fprintf(stderr, "unsupported level value: 0x%x\n", limit);
             abort();
@@ -2771,12 +2771,12 @@ void kvm_arch_pre_run(CPUState *cpu, struct kvm_run *run)
 
     /* Inject NMI */
     if (cpu->interrupt_request & (CPU_INTERRUPT_NMI | CPU_INTERRUPT_SMI)) {
-        if (cpu->interrupt_request & CPU_INTERRUPT_NMI) {
+        if (cpu->interrupt_request & CPU_INTERRUPT_NMI) { // 注入 NMI 中断
             qemu_mutex_lock_iothread();
             cpu->interrupt_request &= ~CPU_INTERRUPT_NMI;
             qemu_mutex_unlock_iothread();
             DPRINTF("injected NMI\n");
-            ret = kvm_vcpu_ioctl(cpu, KVM_NMI);
+            ret = kvm_vcpu_ioctl(cpu, KVM_NMI); // 简单的调用 kvm 的接口
             if (ret < 0) {
                 fprintf(stderr, "KVM: injection failed, NMI lost (%s)\n",
                         strerror(-ret));

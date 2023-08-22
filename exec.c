@@ -389,6 +389,7 @@ bool memory_region_is_unassigned(MemoryRegion *mr)
 }
 
 /* Called from RCU critical section */
+// 在 d 中寻找 addr, 将找到的信息组织成 MemoryRegionSection
 static MemoryRegionSection *address_space_lookup_region(AddressSpaceDispatch *d,
                                                         hwaddr addr,
                                                         bool resolve_subpage)
@@ -1614,7 +1615,7 @@ static void ram_block_add(RAMBlock *new_block, Error **errp)
                 return;
             }
         } else {
-            new_block->host = phys_mem_alloc(new_block->max_length, //分配qemu虚拟内存作为虚拟机物理内存
+            new_block->host = phys_mem_alloc(new_block->max_length, //分配qemu虚拟内存作为虚拟机物理内存 // %qemu_anon_ram_alloc
                                              &new_block->mr->align);
             if (!new_block->host) {
                 error_setg_errno(errp, errno,
@@ -1745,7 +1746,7 @@ RAMBlock *qemu_ram_alloc_internal(ram_addr_t size, ram_addr_t max_size,
     if (resizeable) {
         new_block->flags |= RAM_RESIZEABLE;
     }
-    ram_block_add(new_block, &local_err);
+    ram_block_add(new_block, &local_err); // 这里会去 mmap 来分配 HVA 空间
     if (local_err) {
         g_free(new_block);
         error_propagate(errp, local_err);
@@ -2441,7 +2442,7 @@ void address_space_destroy_dispatch(AddressSpace *as)
 }
 
 //极其重要的函数
-//创建两个address_space, 一个表示真个系统内存地址空间，一个表示IO地址空间
+//创建两个address_space, 一个表示整个系统内存地址空间，一个表示IO地址空间
 //前者根memoryregion是system_memory, 后者根memroyregion是system_io；
 //这两者都是全局变量
 //但是都还没有初始化的
