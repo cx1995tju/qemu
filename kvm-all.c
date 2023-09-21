@@ -242,14 +242,14 @@ static int kvm_set_user_memory_region(KVMMemoryListener *kml, KVMSlot *slot)
     //向KVM注册后，虚拟机对于物理地址的访问，本质就是对QEMU虚拟地址的访问
     //这里实现的本质，应该是KVM将QEMU提供的内存，通过EPT表的设置提供给了虚拟机
     mem.slot = slot->slot | (kml->as_id << 16);
-    mem.guest_phys_addr = slot->start_addr;
-    mem.userspace_addr = (unsigned long)slot->ram;
+    mem.guest_phys_addr = slot->start_addr;	// GPA
+    mem.userspace_addr = (unsigned long)slot->ram; // HVA
     mem.flags = slot->flags;
 
     if (slot->memory_size && mem.flags & KVM_MEM_READONLY) {
         /* Set the slot size to 0 before setting the slot to the desired
          * value. This is needed based on KVM commit 75d61fbc. */
-        mem.memory_size = 0;
+        mem.memory_size = 0;	 // size 为 0 表示 撤销映射
         kvm_vm_ioctl(s, KVM_SET_USER_MEMORY_REGION, &mem);
     }
     mem.memory_size = slot->memory_size;
@@ -703,7 +703,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
     int err;
     MemoryRegion *mr = section->mr;
     bool writeable = !mr->readonly && !mr->rom_device;
-    hwaddr start_addr = section->offset_within_address_space; //设置为该section在address space中的偏移，这个address_space 应该就是address_sapce_system 故这个偏移就是物理内存地址
+    hwaddr start_addr = section->offset_within_address_space; //设置为该section在address space中的偏移，这个address_space 应该就是address_sapce_system 故这个偏移就是物理内存地址 GPA
     ram_addr_t size = int128_get64(section->size);
     void *ram = NULL;
     unsigned delta;
@@ -713,12 +713,12 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
        address to next and truncate size to previous page boundary. */
     delta = qemu_real_host_page_size - (start_addr & ~qemu_real_host_page_mask);
     delta &= ~qemu_real_host_page_mask;
-    if (delta > size) {
+    if (delta > size) { // 即 start_addr + size 没有超过一个 page 边界
         return;
     }
     start_addr += delta;
     size -= delta;
-    size &= qemu_real_host_page_mask;
+    size &= qemu_real_host_page_mask; // size 对齐
     if (!size || (start_addr & ~qemu_real_host_page_mask)) {
         return;
     }
@@ -737,7 +737,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
 
     while (1) {
         mem = kvm_lookup_overlapping_slot(kml, start_addr, start_addr + size);
-        if (!mem) {
+        if (!mem) { // 有重叠会继续在这里处理，没有重叠的的话，直接去初始化一个 新的 slot了。 有重叠的话，处理起来就麻烦
             break;
         }
 
@@ -775,7 +775,7 @@ static void kvm_set_phys_mem(KVMMemoryListener *kml,
          * - and actually require a recent KVM version. */
         if (s->broken_set_mem_region &&
             old.start_addr == start_addr && old.memory_size < size && add) {
-            mem = kvm_alloc_slot(kml);
+            mem = kvm_alloc_slot(kml); // 这里分配 slot，并且设置 slot
             mem->memory_size = old.memory_size;
             mem->start_addr = old.start_addr;
             mem->ram = old.ram;
@@ -964,7 +964,7 @@ void kvm_memory_listener_register(KVMState *s, KVMMemoryListener *kml,
     kml->as_id = as_id;
 
     for (i = 0; i < s->nr_slots; i++) {
-        kml->slots[i].slot = i; //该结构表示KVM内存slot，即对于KVM来说，虚拟机有多少段内存
+        kml->slots[i].slot = i; //该结构表示KVM内存slot，即对于KVM来说，虚拟机有多少段内存, 分配 slot,  %KVM_CAP_NR_MEMSLOTS
     }
 
     kml->listener.region_add = kvm_region_add; //初始化各种回调函数, 然后注册到address space了 %address_space_memory, 该as表示系统内存
@@ -992,6 +992,7 @@ static void kvm_handle_interrupt(CPUState *cpu, int mask)
     }
 }
 
+// 让 kvm 来注入中断
 int kvm_set_irq(KVMState *s, int irq, int level)
 {
     struct kvm_irq_level event;

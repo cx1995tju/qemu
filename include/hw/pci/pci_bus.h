@@ -10,7 +10,7 @@
 
 typedef struct PCIBusClass {
     /*< private >*/
-    BusClass parent_class;
+    BusClass parent_class; // first member is parent class, QOM强制要求，必须的。 refer to %type_initialize()
     /*< public >*/
 
     bool (*is_root)(PCIBus *bus);
@@ -19,7 +19,7 @@ typedef struct PCIBusClass {
 } PCIBusClass;
 
 struct PCIBus {
-    BusState qbus;
+    BusState qbus; // first member is parent, QOM 强制要求，refer to:  %object_init_with_type
     PCIIOMMUFunc iommu_fn;
     void *iommu_opaque;
     uint8_t devfn_min;

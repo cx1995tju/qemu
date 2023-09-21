@@ -26,6 +26,7 @@ static QemuOptsList *find_list(QemuOptsList **lists, const char *group,
 // 在 main 函数开始的位置，在 vm_config_groups 构建各种保存解析结果的选项结构
 // 解析命令行参数的时候，就在这里找一下，看看有没有对应的
 // 找到了，就返回保存该类型参数是的 list
+// 会将某个类型的参数全部返回回来
 QemuOptsList *qemu_find_opts(const char *group)
 {
     QemuOptsList *ret;

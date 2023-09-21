@@ -106,7 +106,7 @@ struct IOAPICCommonState {
     uint8_t id;
     uint8_t ioregsel;
     uint32_t irr;
-    uint64_t ioredtbl[IOAPIC_NUM_PINS];
+    uint64_t ioredtbl[IOAPIC_NUM_PINS]; // ioapic 的 redir_tbl, u64 的值对应到 kernel 的 kvm_ioapic_redirect_entry 结构
     Notifier machine_done;
     uint8_t version;
 };

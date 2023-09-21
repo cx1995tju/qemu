@@ -35,6 +35,7 @@ static void machine_set_accel(Object *obj, const char *value, Error **errp)
     ms->accel = g_strdup(value);
 }
 
+//  machine_set_property  -> object_property_parse  -> call this func
 static void machine_set_kernel_irqchip(Object *obj, Visitor *v,
                                        const char *name, void *opaque,
                                        Error **errp)
@@ -43,12 +44,15 @@ static void machine_set_kernel_irqchip(Object *obj, Visitor *v,
     MachineState *ms = MACHINE(obj);
     OnOffSplit mode;
 
+    // mode 怎么拿到的, v 是一个 string 的visitor，根据 v 解析得到 mode
+    // v 是根据 on|off|split 生成的一个 visitor 
+    // 使用 visitor 来初始化 mode
     visit_type_OnOffSplit(v, name, &mode, &err);
     if (err) {
         error_propagate(errp, err);
         return;
     } else {
-        switch (mode) {
+        switch (mode) { // 根据传递进来的 kernel_irqchip=on|off|split 解析得到的 mode
         case ON_OFF_SPLIT_ON:
             ms->kernel_irqchip_allowed = true;
             ms->kernel_irqchip_required = true;
@@ -359,7 +363,7 @@ static void machine_init_notify(Notifier *notifier, void *data)
 
 static void machine_class_init(ObjectClass *oc, void *data)
 {
-    MachineClass *mc = MACHINE_CLASS(oc);
+    MachineClass *mc = MACHINE_CLASS(oc); // 这个 class 添加了 很多 property
 
     /* Default 128 MB as guest ram size */
     mc->default_ram_size = 128 * M_BYTE;

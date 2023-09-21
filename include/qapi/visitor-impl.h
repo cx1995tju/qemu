@@ -35,12 +35,15 @@
  * assertions apply to output and clone visitors).
  */
 typedef enum VisitorType {
-    VISITOR_INPUT = 1,
-    VISITOR_OUTPUT = 2,
-    VISITOR_CLONE = 3,
+    VISITOR_INPUT = 1, // 输入转换为 QAPI Object
+    VISITOR_OUTPUT = 2, // QAPI object 转换为输出
+    VISITOR_CLONE = 3, // Deep copy QAPI object
     VISITOR_DEALLOC = 4,
 } VisitorType;
 
+// 一个 visitor 其中包含着需要处理的数据
+// 不同类型的 visitor 会在此基础上做扩展, %StringInputVisitor 
+// 自己定义类型后，对应类型的 visitor 代码会自动生成的
 struct Visitor
 {
     /* Must be set to visit structs */
@@ -74,6 +77,8 @@ struct Visitor
     void (*end_alternate)(Visitor *v, void **obj);
 
     /* Must be set */
+    // 一个 visitor 实现了了所有解析基础类型的函数后。QAPI 可以基于此生成处理复杂类型的代码 visit_type_FOO(), visit_type_FOO_members() 等
+    // 用来解析 int64 基础类型的
     void (*type_int64)(Visitor *v, const char *name, int64_t *obj,
                        Error **errp);
 

@@ -290,7 +290,7 @@ static void type_initialize(TypeImpl *ti)
         int i;
 
         g_assert_cmpint(parent->class_size, <=, ti->class_size); //父亲类型，不应该大于子类型的
-        memcpy(ti->class, parent->class, parent->class_size); //层次化来初始化所有Type的class成员。 妙妙妙。 一层一层的将祖先的class信息copy下来, 这里 copy 的 parent class 都是已经被 class_init 过了的  _核心中的核心_
+        memcpy(ti->class, parent->class, parent->class_size); //层次化来初始化所有Type的class成员。 _妙妙妙_ 。 一层一层的将祖先的class信息copy下来, 这里 copy 的 parent class 都是已经被 class_init 过了的  _核心中的核心_
         ti->class->interfaces = NULL;
         ti->class->properties = g_hash_table_new_full( // 创建了保存类属性的 hash 表
             g_str_hash, g_str_equal, g_free, object_property_free);
@@ -377,7 +377,7 @@ void object_initialize_with_type(void *data, size_t size, TypeImpl *type)
 
     memset(obj, 0, type->instance_size);
     obj->class = type->class;
-    object_ref(obj);
+    object_ref(obj); // inc it
     obj->properties = g_hash_table_new_full(g_str_hash, g_str_equal, //搞一个hash table来保存 object 属性咯
                                             NULL, object_property_free);
     object_init_with_type(obj, type);
@@ -971,6 +971,9 @@ object_property_add(Object *obj, const char *name, const char *type,
     return prop;
 }
 
+// 注意与 object_property_add 区分
+// 将 property 加入到 objectclass 中, 这样所有该 class 的 object 都会带上这个属性
+// refer to:  object_property_find()
 ObjectProperty *
 object_class_property_add(ObjectClass *klass,
                           const char *name,
@@ -1099,7 +1102,9 @@ void object_property_get(Object *obj, Visitor *v, const char *name,
 void object_property_set(Object *obj, Visitor *v, const char *name,
                          Error **errp)
 {
-    ObjectProperty *prop = object_property_find(obj, name, errp);
+	// v 是根据属性的值生成的，记录了属性值
+	// name 是属性名
+    ObjectProperty *prop = object_property_find(obj, name, errp); // 找到属性后就去 set
     if (prop == NULL) {
         return;
     }
@@ -1107,7 +1112,7 @@ void object_property_set(Object *obj, Visitor *v, const char *name,
     if (!prop->set) {
         error_setg(errp, QERR_PERMISSION_DENIED);
     } else {
-        prop->set(obj, v, name, prop->opaque, errp);
+        prop->set(obj, v, name, prop->opaque, errp); // 调用 name 对应的属性的 set 函数, %machine_set_kernel_irqchip()。refer to: machine_class_init() 
     }
 }
 
@@ -1304,10 +1309,12 @@ out:
     visit_free(v);
 }
 
+// qom object 系统使用了 visitor 机制
 void object_property_parse(Object *obj, const char *string,
                            const char *name, Error **errp)
 {
-    Visitor *v = string_input_visitor_new(string);
+    // 创建一个 string input type 的visitor
+    Visitor *v = string_input_visitor_new(string); // 生成一个 string 的 input visitor, 即后续可以从 v 中提取 string 内容
     object_property_set(obj, v, name, errp);
     visit_free(v);
 }

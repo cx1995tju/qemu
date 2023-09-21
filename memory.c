@@ -2302,6 +2302,7 @@ void memory_global_dirty_log_stop(void)
     MEMORY_LISTENER_CALL_GLOBAL(log_global_stop, Reverse);
 }
 
+// 通知 listener，这个 as 上发生了 add 事件
 static void listener_add_address_space(MemoryListener *listener,
                                        AddressSpace *as)
 {
@@ -2331,7 +2332,7 @@ static void listener_add_address_space(MemoryListener *listener,
             listener->log_start(listener, &section, 0, fr->dirty_log_mask);
         }
         if (listener->region_add) {
-            listener->region_add(listener, &section);
+            listener->region_add(listener, &section); // 将 AddressSpace flat 后, 一个一个 section 的来通知 add 事件
         }
     }
     if (listener->commit) {

@@ -100,7 +100,7 @@ typedef struct DeviceClass {
     DECLARE_BITMAP(categories, DEVICE_CATEGORY_MAX); //设备种类，譬如DEVICE_CATEGORY_USB表示USB设备
     const char *fw_name; //生产设备在固件中的路径
     const char *desc; //描述设备
-    Property *props; //设备属性数组。 C类型的 DeviceState 对应的QOM类型 TYPE_DEVICE 的对象构造函数 device_initfn 中添加了这里定义的prop
+    Property *props; //设备属性数组。 C类型的 DeviceState 对应的QOM类型 TYPE_DEVICE 的对象构造函数 device_initfn 中添加了这里定义的prop。注意这里的 Property 不是 ObjectClass 中的 ObjectProperty properties
 
     /*
      * Shall we hide this device model from -device / device_add?
@@ -191,7 +191,7 @@ struct DeviceListener {
 
 //refer to BusState
 struct BusClass {
-    ObjectClass parent_class;
+    ObjectClass parent_class; // 父类信息
 
     /* FIXME first arg should be BusState */
     void (*print_dev)(Monitor *mon, DeviceState *dev, int indent); //打印总线上的一个设备

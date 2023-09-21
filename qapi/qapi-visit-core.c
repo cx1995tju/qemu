@@ -287,8 +287,8 @@ void visit_type_str(Visitor *v, const char *name, char **obj, Error **errp)
      * can enable:
     assert(!(v->type & VISITOR_OUTPUT) || *obj);
      */
-    trace_visit_type_str(v, name, obj);
-    v->type_str(v, name, obj, &err);
+    trace_visit_type_str(v, name, obj); // v 应该是一个 string visitor，这里就是从里面提取出 string
+    v->type_str(v, name, obj, &err); // parse_type_str,  print_type_str, qobject_input_type_str
     if (v->type & VISITOR_INPUT) {
         assert(!err != !*obj);
     }
@@ -323,6 +323,8 @@ void visit_type_null(Visitor *v, const char *name, Error **errp)
     v->type_null(v, name, errp);
 }
 
+// obj 是一个枚举值，其肯定对应了一个描述的字符串，即保存在strings 中的
+// 将其对应的 string 保存到 v 中
 static void output_type_enum(Visitor *v, const char *name, int *obj,
                              const char *const strings[], Error **errp)
 {
@@ -340,6 +342,8 @@ static void output_type_enum(Visitor *v, const char *name, int *obj,
     visit_type_str(v, name, &enum_str, errp);
 }
 
+
+// qapi 为 enum 类型生成代码的时候，会为每个 枚举值 生成一个 描述项，或者称作查找表，就是这里的 strings
 static void input_type_enum(Visitor *v, const char *name, int *obj,
                             const char *const strings[], Error **errp)
 {
@@ -347,6 +351,7 @@ static void input_type_enum(Visitor *v, const char *name, int *obj,
     int64_t value = 0;
     char *enum_str;
 
+    // 从 v 中 提取 string
     visit_type_str(v, name, &enum_str, &local_err);
     if (local_err) {
         error_propagate(errp, local_err);
@@ -354,7 +359,7 @@ static void input_type_enum(Visitor *v, const char *name, int *obj,
     }
 
     while (strings[value] != NULL) {
-        if (strcmp(strings[value], enum_str) == 0) {
+        if (strcmp(strings[value], enum_str) == 0) { // 用 enum_str 在 strings 里查找。进而计算得到 enum 值
             break;
         }
         value++;
@@ -370,12 +375,17 @@ static void input_type_enum(Visitor *v, const char *name, int *obj,
     *obj = value;
 }
 
+// qapi 为 enum 类型生成代码的时候，会为每个 枚举值 生成一个 描述项，或者称作查找表，就是这里的 strings
+// v 记录了 data
+// obj 是对应的 枚举对象
+// name 在这里没太大用
+// strings 是一个 lookup table，通过比对 v 和 strings 中的元素，来做下一步事件
 void visit_type_enum(Visitor *v, const char *name, int *obj,
                      const char *const strings[], Error **errp)
 {
     assert(obj && strings);
     switch (v->type) {
-    case VISITOR_INPUT:
+    case VISITOR_INPUT: // 将 v 中包含的data，转换为 obj。因为这个是 visit enum，所以 obj 是一个 int*
         input_type_enum(v, name, obj, strings, errp);
         break;
     case VISITOR_OUTPUT:

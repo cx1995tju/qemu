@@ -147,6 +147,7 @@ static void pci_bus_class_init(ObjectClass *klass, void *data)
     BusClass *k = BUS_CLASS(klass);
     PCIBusClass *pbc = PCI_BUS_CLASS(klass);
 
+    // 设置一些基础的 callback 咯
     k->print_dev = pcibus_dev_print;
     k->get_dev_path = pcibus_get_dev_path;
     k->get_fw_dev_path = pcibus_get_fw_dev_path;
@@ -2508,7 +2509,7 @@ static void pci_device_class_init(ObjectClass *klass, void *data)
     k->realize = pci_qdev_realize; //修改了其父class 的realize函数的, qdev_create_nofail中可能进入realize路径
     k->unrealize = pci_qdev_unrealize;
     k->bus_type = TYPE_PCI_BUS; //所有PCI设备挂载的总线类型必然是PCI总线咯，所以这部分信息可以放置在DviceClass中
-    k->props = pci_props;
+    k->props = pci_props;	// 一些公共的属性
     pc->realize = pci_default_realize; //设置自己这个类的realize函数
 }
 

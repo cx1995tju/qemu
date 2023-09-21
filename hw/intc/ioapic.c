@@ -126,7 +126,7 @@ static void ioapic_service(IOAPICCommonState *s)
                 }
 
 #ifdef CONFIG_KVM
-                if (kvm_irqchip_is_split()) {
+                if (kvm_irqchip_is_split()) { // 通过 kvm 模拟的中断
                     if (info.trig_mode == IOAPIC_TRIGGER_EDGE) {
                         kvm_set_irq(kvm_state, i, 1);
                         kvm_set_irq(kvm_state, i, 0);
@@ -147,6 +147,7 @@ static void ioapic_service(IOAPICCommonState *s)
     }
 }
 
+// 触发中断
 static void ioapic_set_irq(void *opaque, int vector, int level)
 {
     IOAPICCommonState *s = opaque;
@@ -159,7 +160,7 @@ static void ioapic_set_irq(void *opaque, int vector, int level)
     if (vector == 0) {
         vector = 2;
     }
-    if (vector >= 0 && vector < IOAPIC_NUM_PINS) {
+    if (vector >= 0 && vector < IOAPIC_NUM_PINS) { // 根据 ioapic 的 redir_tbl 来设置中断触发
         uint32_t mask = 1 << vector;
         uint64_t entry = s->ioredtbl[vector];
 

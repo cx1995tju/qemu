@@ -112,6 +112,7 @@ void qdev_set_parent_bus(DeviceState *dev, BusState *bus)
    structure and allows properties to be set.  The device still needs
    to be realized.  See qdev-core.h.  */
 //第一个参数表示设备所属bus，如果是NULL， 表示系统总线, 即设备会被挂载在系统总线main_system_bus
+// name 就是 device 对应的 TYPE name
 DeviceState *qdev_create(BusState *bus, const char *name)
 {
     DeviceState *dev;
@@ -137,7 +138,7 @@ DeviceState *qdev_try_create(BusState *bus, const char *type)
     if (object_class_by_name(type) == NULL) {
         return NULL;
     }
-    dev = DEVICE(object_new(type)); //new 一个设备QOM对象
+    dev = DEVICE(object_new(type)); //new 一个设备QOM对象, 使用对应设备的 构造函数
     if (!dev) {
         return NULL;
     }
@@ -153,7 +154,7 @@ DeviceState *qdev_try_create(BusState *bus, const char *type)
     }
 
     qdev_set_parent_bus(dev, bus); //设备挂载到bus上
-    object_unref(OBJECT(dev));
+    object_unref(OBJECT(dev)); // why??? so ugly???
     return dev;
 }
 
@@ -942,7 +943,7 @@ static void device_set_realized(Object *obj, bool value, Error **errp)
                                            dev->alias_required_for_version);
         }
 
-        QLIST_FOREACH(bus, &dev->child_bus, sibling) {
+        QLIST_FOREACH(bus, &dev->child_bus, sibling) {	// 这个设备上挂载的所有bus都需要被 realize
             object_property_set_bool(OBJECT(bus), true, "realized", //先设置好子设备的的realize属性
                                          &local_err);
             if (local_err != NULL) {

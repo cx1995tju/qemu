@@ -51,11 +51,11 @@ void kvm_pc_gsi_handler(void *opaque, int n, int level)
 {
     GSIState *s = opaque;
 
-    if (n < ISA_NUM_IRQS) {
+    if (n < ISA_NUM_IRQS) { // PIC 和 IOAPIC 兼容的 前 16 号中断
         /* Kernel will forward to both PIC and IOAPIC */
         qemu_set_irq(s->i8259_irq[n], level);
-    } else {
-        qemu_set_irq(s->ioapic_irq[n], level);
+    } else { // IOAPIC 支持的 16 ～ 23号中断
+        qemu_set_irq(s->ioapic_irq[n], level); // 触发中断
     }
 }
 

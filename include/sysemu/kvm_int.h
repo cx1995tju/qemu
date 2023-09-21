@@ -24,7 +24,7 @@ typedef struct KVMSlot
 
 typedef struct KVMMemoryListener {
     MemoryListener listener;
-    KVMSlot *slots; //该结构表示KVM内存slot，即对于KVM来说，虚拟机有多少段内存. refer to kvm_init ioctl(KVM_CAP_NR_MEMSLOTS)
+    KVMSlot *slots; //该结构表示KVM内存slot(内存插槽，可以认为 KVM 最多支持这么多段内存)，即对于KVM来说，虚拟机有多少段内存. refer to kvm_init ioctl(KVM_CAP_NR_MEMSLOTS)
     int as_id;
 } KVMMemoryListener;
 

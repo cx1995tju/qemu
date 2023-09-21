@@ -91,7 +91,7 @@ static void qbus_realize(BusState *bus, DeviceState *parent, const char *name)
         /* parent device has id -> use it plus parent-bus-id for bus name */
         bus_id = bus->parent->num_child_bus;
         bus->name = g_strdup_printf("%s.%d", bus->parent->id, bus_id);
-    } else {
+    } else { // parent 都没有, 再换一种方式生成name
         /* no id -> use lowercase bus type plus global bus-id for bus name */
         bc = BUS_GET_CLASS(bus);
         bus_id = bc->automatic_ids++;
@@ -105,13 +105,13 @@ static void qbus_realize(BusState *bus, DeviceState *parent, const char *name)
     if (bus->parent) {
         QLIST_INSERT_HEAD(&bus->parent->child_bus, bus, sibling); //总线挂载到其所属设备的child bus上
         bus->parent->num_child_bus++;
-        object_property_add_child(OBJECT(bus->parent), bus->name, OBJECT(bus), NULL); //child关系
-        object_unref(OBJECT(bus));
+        object_property_add_child(OBJECT(bus->parent), bus->name, OBJECT(bus), NULL); //child关系, 那这个bus就是 parent 的 child
+        object_unref(OBJECT(bus)); // why??? so ugly???
     } else if (bus != sysbus_get_default()) {
         /* TODO: once all bus devices are qdevified,
            only reset handler for main_system_bus should be registered here. */
         qemu_register_reset(qbus_reset_all_fn, bus);
-    }
+    } // 如果是 main_system_bus 总线的话，两个分支都不会进入，直接退出了
 }
 
 static void bus_unparent(Object *obj)
@@ -139,6 +139,7 @@ static void bus_unparent(Object *obj)
 void qbus_create_inplace(void *bus, size_t size, const char *typename,
                          DeviceState *parent, const char *name)
 {
+	// bus 被分配过了，这里仅仅是 初始化
     object_initialize(bus, size, typename); //构造函数
     qbus_realize(bus, parent, name); 
 }
@@ -177,7 +178,7 @@ static void bus_set_realized(Object *obj, bool value, Error **errp)
 
         /* TODO: recursive realization */
     } else if (!value && bus->realized) {
-        QTAILQ_FOREACH(kid, &bus->children, sibling) {
+        QTAILQ_FOREACH(kid, &bus->children, sibling) { // realize 所有的 children
             DeviceState *dev = kid->child;
             object_property_set_bool(OBJECT(dev), false, "realized",
                                      &local_err);
@@ -205,12 +206,12 @@ static void qbus_initfn(Object *obj)
     QTAILQ_INIT(&bus->children);
     object_property_add_link(obj, QDEV_HOTPLUG_HANDLER_PROPERTY,
                              TYPE_HOTPLUG_HANDLER,
-                             (Object **)&bus->hotplug_handler, //通过这个二级指针能够设置bus的hotplut_handler的指向, 通过设置其指向，就完成了一个对象与对象之间link关系的表达
+                             (Object **)&bus->hotplug_handler, //通过这个二级指针能够设置bus的hotplug_handler的指向, 通过设置其指向，就完成了一个对象与对象之间link关系的表达
                              object_property_allow_set_link,
                              OBJ_PROP_LINK_UNREF_ON_RELEASE,
                              NULL);
-    object_property_add_bool(obj, "realized",
-                             bus_get_realized, bus_set_realized, NULL); //realize是一个bool类型属性
+    object_property_add_bool(obj, "realized",			// TYPE_BUS 和 TYPE_DEVICE 一样，都有 realize 属性
+                             bus_get_realized, bus_set_realized, NULL); //realize是一个bool类型属性, set 函数是 bus_set_realized
 }
 
 static char *default_bus_get_fw_dev_path(DeviceState *dev)

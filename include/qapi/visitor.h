@@ -43,7 +43,7 @@
  *
  * Visitor *subtype_visitor_new(parameters...);
  *
- * A visitor should be used for exactly one top-level visit_type_FOO()
+ * A visitor should be used for exactly one top-level visit_type_FOO() // visit_type_str|int 这种基本类型的都已经定义号了。对于 QAPI 定义的类型，代码生成的时候会生成对应的代码的。对于 input类型的 visitor 这个函数就是将 visitor 的值提取出来，转换为 对应 的 FOO 类型的对象。对于 output 类型，则是将 FOO 对象的信息提取出来，保存到 output 的visitor 中
  * or virtual walk; if that is successful, the caller can optionally
  * call visit_complete() (for now, useful only for output visits, but
  * safe to call on all visits).  Then, regardless of success or
@@ -60,7 +60,7 @@
  * visitors are declared here; the remaining visitors are generated in
  * qapi-visit.h.
  *
- * The @name parameter of visit_type_FOO() describes the relation
+ * The @name parameter of visit_type_FOO() describes the relation // 譬如：访问 struct member visit_type_FOO_members() 的时候，name 用来索引是哪一个 member
  * between this QAPI value and its parent container.  When visiting
  * the root of a tree, @name is ignored; when visiting a member of an
  * object, @name is the key associated with the value; and when

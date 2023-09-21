@@ -345,12 +345,12 @@ static void main_system_bus_create(void)
     /* assign main_system_bus before qbus_create_inplace()
      * in order to make "if (bus != sysbus_get_default())" work */
     main_system_bus = g_malloc0(system_bus_info.instance_size);
-    qbus_create_inplace(main_system_bus, system_bus_info.instance_size,
+    qbus_create_inplace(main_system_bus, system_bus_info.instance_size, // main-system-bus 本身也是一个 qbus，不过其 parent is NULL
                         TYPE_SYSTEM_BUS, NULL, "main-system-bus");
     OBJECT(main_system_bus)->free = g_free;
     object_property_add_child(container_get(qdev_get_machine(),
                                             "/unattached"),
-                              "sysbus", OBJECT(main_system_bus), NULL); //为main_system_bus增加父亲
+                              "sysbus", OBJECT(main_system_bus), NULL); // 将 main_system_bus 增加为 qdev_get_machine() 的 孩子。info qom-tree
 }
 
 BusState *sysbus_get_default(void)

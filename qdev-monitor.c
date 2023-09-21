@@ -567,7 +567,8 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
     BusState *bus = NULL;
     Error *err = NULL;
 
-    driver = qemu_opt_get(opts, "driver");
+    // opts 描述了一个设备的所有参数
+    driver = qemu_opt_get(opts, "driver"); // 就是对应设备的 QOM type name
     if (!driver) {
         error_setg(errp, QERR_MISSING_PARAMETER, "driver");
         return NULL;
@@ -591,7 +592,7 @@ DeviceState *qdev_device_add(QemuOpts *opts, Error **errp)
                        driver, object_get_typename(OBJECT(bus)));
             return NULL;
         }
-    } else if (dc->bus_type != NULL) { //没有指定bus的话，就使用dc的bus_type
+    } else if (dc->bus_type != NULL) { //没有指定bus的话，就使用dc的bus_type, 常态
         bus = qbus_find_recursive(sysbus_get_default(), NULL, dc->bus_type);
         if (!bus || qbus_is_full(bus)) {
             error_setg(errp, "No '%s' bus found for device '%s'",

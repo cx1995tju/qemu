@@ -32,8 +32,8 @@
 struct IRQState {
     Object parent_obj;
 
-    qemu_irq_handler handler; //表示执行函数
-    void *opaque; //参数
+    qemu_irq_handler handler; //表示执行函数: %kvm_pc_gsi_handler, 当qemu 设备触发中断的时候，执行这个函数。本质就是将相关信息通知到 kvm ，让kvm 来做中断模拟和中断注入。如果是qemu 自己模拟，就是gsi_handler(), qemu 自己负责中断芯片的模拟
+    void *opaque; //参数, pc_init1()::gsi_state, GSIState
     int n; //引脚号
 };
 
@@ -44,7 +44,7 @@ void qemu_set_irq(qemu_irq irq, int level)
     if (!irq)
         return;
 
-    irq->handler(irq->opaque, irq->n, level); //%kvm_pic_set_irq, 最终的触发当然还是要落实到KVM侧（前提：KVM参与中断芯片模拟）
+    irq->handler(irq->opaque, irq->n, level); //%kvm_pic_set_irq %kvm_ioapic_set_irq , 最终的触发当然还是要落实到KVM侧（前提：KVM参与中断芯片模拟）
 }
 
 qemu_irq *qemu_extend_irqs(qemu_irq *old, int n_old, qemu_irq_handler handler,

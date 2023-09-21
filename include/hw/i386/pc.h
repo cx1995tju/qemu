@@ -195,8 +195,9 @@ void ioapic_dump_state(Monitor *mon, const QDict *qdict);
 #define GSI_NUM_PINS IOAPIC_NUM_PINS
 
 //表示虚拟机的中断状态
+// %pc_init1()
 typedef struct GSIState {
-    qemu_irq i8259_irq[ISA_NUM_IRQS]; //XT-PIC的16个引脚
+    qemu_irq i8259_irq[ISA_NUM_IRQS]; //XT-PIC的16个引脚, master PIC + slave PIC
     qemu_irq ioapic_irq[IOAPIC_NUM_PINS]; //IOAPIC的24个引脚
 } GSIState;
 

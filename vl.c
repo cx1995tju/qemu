@@ -2807,6 +2807,9 @@ static MachineClass *select_machine(void)
     return machine_class;
 }
 
+// name is machine opt name
+// value is machine str
+// opaque is vl.c:main():current_machine 
 static int machine_set_property(void *opaque,
                                 const char *name, const char *value,
                                 Error **errp)
@@ -2815,17 +2818,20 @@ static int machine_set_property(void *opaque,
     Error *local_err = NULL;
     char *p, *qom_name;
 
+    // 不处理 type 参数
     if (strcmp(name, "type") == 0) {
         return 0;
     }
 
     qom_name = g_strdup(name);
     for (p = qom_name; *p; p++) {
-        if (*p == '_') {
+        if (*p == '_') { // - _ 转换
             *p = '-';
         }
     }
 
+    // qom_name 是属性名
+    // value 是属性值
     object_property_parse(obj, value, qom_name, &local_err);
     g_free(qom_name);
 
@@ -3148,7 +3154,7 @@ int main(int argc, char **argv, char **envp)
             switch(popt->index) { // 各个类型参数的解析，就 case by case 的看了，其中最重要的就是 -device
             case QEMU_OPTION_no_kvm_irqchip: {
                 olist = qemu_find_opts("machine");
-                qemu_opts_parse_noisily(olist, "kernel_irqchip=off", false);
+                qemu_opts_parse_noisily(olist, "kernel_irqchip=off", false); // 属于 -machine 大选项
                 break;
             }
             case QEMU_OPTION_cpu:
@@ -4351,9 +4357,12 @@ int main(int argc, char **argv, char **envp)
         exit(0);
     }
 
-    machine_opts = qemu_get_machine_opts();
+    machine_opts = qemu_get_machine_opts(); // 处理所有的 machine_ops 中的小选项
+    // 一个一个处理 name=val 的小选项对
+    // 其中每个 name 都对应到 current_machine 一个属性, refer to %machine_class_init 
+    // 每个属性都有 set 函数，set 函数会根据值来做具体的操作
     if (qemu_opt_foreach(machine_opts, machine_set_property, current_machine,
-                         NULL)) {
+                         NULL)) { // 使用 machine_set_property 函数来处理每个 machine 的小选项
         object_unref(OBJECT(current_machine));
         exit(1);
     }

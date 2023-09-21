@@ -184,10 +184,10 @@ static void pc_init1(MachineState *machine,
     }
 
     gsi_state = g_malloc0(sizeof(*gsi_state));
-    if (kvm_ioapic_in_kernel()) {
+    if (kvm_ioapic_in_kernel()) { // 让 kvm 来模拟 ioapic
         kvm_pc_setup_irq_routing(pcmc->pci_enabled);
-        pcms->gsi = qemu_allocate_irqs(kvm_pc_gsi_handler, gsi_state, //将表示虚拟机中断状态的结构保存了, 作为kvm_pc_gsi_handler的参数
-                                       GSI_NUM_PINS);
+        pcms->gsi = qemu_allocate_irqs(kvm_pc_gsi_handler, gsi_state, //将表示虚拟机中断状态的结构保存了, 作为kvm_pc_gsi_handler的参数。虽然是让 kvm 来模拟，但是 qemu 还是要维护必要的结构的。从 qeu 的角度来看，仅仅是 gsi 的 handler 不同
+                                       GSI_NUM_PINS); // 分配一批 irq 结构，设置好 handler
     } else {
         pcms->gsi = qemu_allocate_irqs(gsi_handler, gsi_state, GSI_NUM_PINS);
     }
@@ -210,7 +210,7 @@ static void pc_init1(MachineState *machine,
     }
     isa_bus_irqs(isa_bus, pcms->gsi);
 
-    if (kvm_pic_in_kernel()) {
+    if (kvm_pic_in_kernel()) { // 让 kvm 来模拟 pic 设备
         i8259 = kvm_i8259_init(isa_bus); //创建PIC设备，即两个8259A芯片
     } else if (xen_enabled()) {
         i8259 = xen_interrupt_controller_init();

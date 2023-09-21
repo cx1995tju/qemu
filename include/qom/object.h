@@ -367,6 +367,7 @@ typedef void (ObjectFree)(void *obj);
  * The base for all classes.  The only thing that #ObjectClass contains is an
  * integer type handle.
  */
+// 记录 类型原本的信息
 //类似于C++类的静态成员, 类的静态成员之间，也构成同样的继承关系的
 //譬如：DeviceClass -> PCIDeviceClass -> VirtioPCIClass
 //是每个类型有一份class信息的，参考 type_initialize(TypeImpl *ti), 不过对于子类型，当然可以重写父类型的信息了。

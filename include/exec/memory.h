@@ -204,7 +204,7 @@ struct MemoryRegion {
     bool flush_coalesced_mmio;
     bool global_locking;
     uint8_t dirty_log_mask;
-    RAMBlock *ram_block; //记录实际分配的HVA
+    RAMBlock *ram_block; //记录实际分配的HVA	_HVA_
     Object *owner;
     const MemoryRegionIOMMUOps *iommu_ops;
 
@@ -212,7 +212,7 @@ struct MemoryRegion {
     void *opaque; //譬如，可以设置为一个具体的设备结构，是ops中函数的调用参数，这样就可以根据memory region找到设备了
     MemoryRegion *container; //表示其上一级的MemoryRegion, 即其属于哪一个container, 参考%memory_region_add_subregion_common
     Int128 size;
-    hwaddr addr; //该MemoryRegion所在的 **虚拟机上的物理地址**
+    hwaddr addr; //该MemoryRegion所在的 **虚拟机上的物理地址** _GPA_
     void (*destructor)(MemoryRegion *mr);
     uint64_t align;
     bool terminates; //指示是否是叶子节点
@@ -308,7 +308,7 @@ struct AddressSpace {
  * @readonly: writes to this section are ignored
  */
 struct MemoryRegionSection {
-    MemoryRegion *mr;
+    MemoryRegion *mr; // 这里有 HVA / GPA 的信息
     AddressSpace *address_space;
     hwaddr offset_within_region;
     Int128 size;

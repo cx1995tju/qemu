@@ -1670,16 +1670,16 @@ void ioapic_init_gsi(GSIState *gsi_state, const char *parent_name)
     SysBusDevice *d;
     unsigned int i;
 
-    if (kvm_ioapic_in_kernel()) {
+    if (kvm_ioapic_in_kernel()) { // 常态
         dev = qdev_create(NULL, "kvm-ioapic");
     } else {
         dev = qdev_create(NULL, "ioapic");
     }
     if (parent_name) {
-        object_property_add_child(object_resolve_path(parent_name, NULL),
+        object_property_add_child(object_resolve_path(parent_name, NULL), // 将这个 ioapic 设置为 parent_name 的 child
                                   "ioapic", OBJECT(dev), NULL);
     }
-    qdev_init_nofail(dev);
+    qdev_init_nofail(dev); // 继续初始化, 里面调用了realize 函数 kvm_ioapic_realize
     d = SYS_BUS_DEVICE(dev);
     sysbus_mmio_map(d, 0, IO_APIC_DEFAULT_ADDRESS);
 

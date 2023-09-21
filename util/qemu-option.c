@@ -331,7 +331,7 @@ const char *qemu_opt_get(QemuOpts *opts, const char *name)
             return desc->def_value_str;
         }
     }
-    return opt ? opt->str : NULL; // 返回的是选项的name，不是 value
+    return opt ? opt->str : NULL;
 }
 
 /* Get a known option (or its default) and remove it from the list
@@ -617,7 +617,7 @@ int qemu_opt_foreach(QemuOpts *opts, qemu_opt_loopfunc func, void *opaque,
     int rc;
 
     QTAILQ_FOREACH(opt, &opts->head, next) {
-        rc = func(opaque, opt->name, opt->str, errp);
+        rc = func(opaque, opt->name, opt->str, errp); // name 是属性名，str 是属性值
         if (rc) {
             return rc;
         }
