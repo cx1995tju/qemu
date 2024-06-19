@@ -131,7 +131,7 @@ ObjectPropertyInfoList *qmp_device_list_properties(const char *typename,
     ObjectPropertyIterator iter;
     ObjectPropertyInfoList *prop_list = NULL;
 
-    klass = object_class_by_name(typename);
+    klass = object_class_by_name(typename); // 根据 typename 找到类型,  e.g.  %virtio-balloon-pci
     if (klass == NULL) {
         error_set(errp, ERROR_CLASS_DEVICE_NOT_FOUND,
                   "Device '%s' not found", typename);
@@ -150,14 +150,14 @@ ObjectPropertyInfoList *qmp_device_list_properties(const char *typename,
         return NULL;
     }
 
-    obj = object_new(typename);
+    obj = object_new(typename); // 创建一个对象, 会调用对应的构造函数。在构造函数 instance_init() 里一般会添加 property 的
 
     object_property_iter_init(&iter, obj);
     while ((prop = object_property_iter_next(&iter))) {
         ObjectPropertyInfo *info;
         ObjectPropertyInfoList *entry;
 
-        /* Skip Object and DeviceState properties */
+        /* Skip Object and DeviceState properties */	// 有些属性在这里不处理，跳过
         if (strcmp(prop->name, "type") == 0 ||
             strcmp(prop->name, "realized") == 0 ||
             strcmp(prop->name, "hotpluggable") == 0 ||

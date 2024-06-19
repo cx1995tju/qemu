@@ -30,25 +30,25 @@
 #include "qemu/error-report.h"
 
 struct QemuOpt {
-    char *name;
-    char *str;
+    char *name;			// opt name, key
+    char *str;			// value  string 类型
 
-    const QemuOptDesc *desc;
+    const QemuOptDesc *desc;	// desc
     union {
         bool boolean;
         uint64_t uint;
-    } value;
+    } value;			// value	u64/bool 类型
 
-    QemuOpts     *opts;
-    QTAILQ_ENTRY(QemuOpt) next;
+    QemuOpts     *opts;		// link to QemuOpts
+    QTAILQ_ENTRY(QemuOpt) next; // QemuOpts has many k-v pairs(aka QemuOpt), organize these k-v pairs with next
 };
 
 struct QemuOpts {
-    char *id;
-    QemuOptsList *list;
-    Location loc;
-    QTAILQ_HEAD(, QemuOpt) head;
-    QTAILQ_ENTRY(QemuOpts) next;
+    char *id;			 // key
+    QemuOptsList *list;		 // link to QemuOptsList
+    Location loc; // %LOC_CMDLINE
+    QTAILQ_HEAD(, QemuOpt) head; // organize the child struct QemuOpt
+    QTAILQ_ENTRY(QemuOpts) next; // link to parent struct QemuOptsList
 };
 
 #endif

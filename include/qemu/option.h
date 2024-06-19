@@ -50,7 +50,7 @@ typedef struct QemuOptDesc {
 } QemuOptDesc;
 
 struct QemuOptsList {
-    const char *name;
+    const char *name;  // qemu 里一个大选项的名字
     const char *implied_opt_name;
     bool merge_lists;  /* Merge multiple uses of option into a single list? */
     QTAILQ_HEAD(, QemuOpts) head;

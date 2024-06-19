@@ -43,6 +43,7 @@ struct InterfaceImpl
     const char *typename;
 };
 
+// 基本是从 TypeInfo copy 过来的
 struct TypeImpl
 {
     const char *name;
@@ -73,6 +74,7 @@ struct TypeImpl
 
 static Type type_interface;
 
+// QOM 所有的 type 都保存在这个 table 里？
 static GHashTable *type_table_get(void)
 {
     static GHashTable *type_table;
@@ -142,12 +144,15 @@ static TypeImpl *type_register_internal(const TypeInfo *info)
     return ti;
 }
 
+// 提供一个 TypeInfo 结构描述 type
+// 返回一个该结构的实现 TypeImpl
 TypeImpl *type_register(const TypeInfo *info)
 {
     assert(info->parent);
     return type_register_internal(info);
 }
 
+// 这里的返回值并没有谁会使用，因为这个函数最终调用是在初始化的时候 module_call_init(MODULE_INIT_QOM)。那时候没有人关心返回值
 TypeImpl *type_register_static(const TypeInfo *info)
 {
     return type_register(info);
@@ -284,7 +289,7 @@ static void type_initialize(TypeImpl *ti)
 {
     TypeImpl *parent;
 
-    if (ti->class) {
+    if (ti->class) { // 初始化过了
         return;
     }
 
@@ -307,8 +312,8 @@ static void type_initialize(TypeImpl *ti)
     ti->class = g_malloc0(ti->class_size);
 
     parent = type_get_parent(ti);
-    if (parent) {
-        type_initialize(parent);
+    if (parent) {	// 主要这里有一个递归，确保所有祖先类型先被初始化
+        type_initialize(parent); // 递归
         GSList *e;
         int i;
 
@@ -354,7 +359,7 @@ static void type_initialize(TypeImpl *ti)
 
     ti->class->type = ti;
 
-    while (parent) {
+    while (parent) { // 注意，这里自己的 class_base_init 是没有调用的。调用的时候，是从 parent 到 最顶层的祖先反向调用的
         if (parent->class_base_init) {
             parent->class_base_init(ti->class, ti->class_data);
         }
@@ -366,10 +371,11 @@ static void type_initialize(TypeImpl *ti)
     }
 }
 
+// 递归调用，会先调用最高最先的 init 函数的
 static void object_init_with_type(Object *obj, TypeImpl *ti)
 {
     if (type_has_parent(ti)) {
-        object_init_with_type(obj, type_get_parent(ti));
+        object_init_with_type(obj, type_get_parent(ti));	// 递归咯
     }
 
     if (ti->instance_init) {
@@ -461,7 +467,7 @@ void object_register_sugar_prop(const char *driver, const char *prop, const char
 void object_set_machine_compat_props(GPtrArray *compat_props)
 {
     assert(!object_compat_props[1]);
-    object_compat_props[1] = compat_props;
+    object_compat_props[1] = compat_props; // 简单的保存到一个全局变量中
 }
 
 /*
@@ -510,8 +516,8 @@ static void object_initialize_with_type(void *data, size_t size, TypeImpl *type)
     memset(obj, 0, type->instance_size);
     obj->class = type->class;
     object_ref(obj);
-    object_class_property_init_all(obj);
-    obj->properties = g_hash_table_new_full(g_str_hash, g_str_equal,
+    object_class_property_init_all(obj); // 对于 class 的property，在创建 object 的时候要 init 下
+    obj->properties = g_hash_table_new_full(g_str_hash, g_str_equal, // 分配  properties 的 hash 表，后续用来保存 property
                                             NULL, object_property_free);
     object_init_with_type(obj, type);
     object_post_init_with_type(obj, type);
@@ -1006,6 +1012,12 @@ typedef struct OCFData
     void *opaque;
 } OCFData;
 
+// 对于每个 key 执行 opaque—>fn 函数
+// key 是 QOM type name
+// value 是 QOM TypeImpl (type 实现)
+//
+// 如果 value 指定的 TypeImpl 是 opaque->implements_type 指定的祖先类
+// 就执行 opaque->fn() 函数
 static void object_class_foreach_tramp(gpointer key, gpointer value,
                                        gpointer opaque)
 {
@@ -1013,21 +1025,22 @@ static void object_class_foreach_tramp(gpointer key, gpointer value,
     TypeImpl *type = value;
     ObjectClass *k;
 
-    type_initialize(type);
+    type_initialize(type); // 例行初始化
     k = type->class;
 
-    if (!data->include_abstract && type->abstract) {
+    if (!data->include_abstract && type->abstract) { // 如果 data 里表示不要处理抽象类，但是这个类是抽象类，那么 skipp 了
         return;
     }
 
-    if (data->implements_type && 
+    if (data->implements_type &&  // data 是 implements_type 这个类，其祖先类是 k。将其强制转换看能否成功，可以就继续
         !object_class_dynamic_cast(k, data->implements_type)) {
         return;
     }
 
-    data->fn(k, data->opaque);
+    data->fn(k, data->opaque); 
 }
 
+// 遍历所有的 QOM class
 void object_class_foreach(void (*fn)(ObjectClass *klass, void *opaque),
                           const char *implements_type, bool include_abstract,
                           void *opaque)
@@ -1035,6 +1048,8 @@ void object_class_foreach(void (*fn)(ObjectClass *klass, void *opaque),
     OCFData data = { fn, implements_type, include_abstract, opaque };
 
     enumerating_types = true;
+    // 遍历所有的 QOM class，即 type_table_get() 这个 hash table
+    // 然后在每个元素上执行: object_class_foreach_tramp(key, value, data)
     g_hash_table_foreach(type_table_get(), object_class_foreach_tramp, &data);
     enumerating_types = false;
 }
@@ -1084,6 +1099,7 @@ static void object_class_get_list_tramp(ObjectClass *klass, void *opaque)
     *list = g_slist_prepend(*list, klass);
 }
 
+// 遍历 QOM type hash table，将 implements_type 所有的祖先类都手机到 list 中了。应该包括其自身
 GSList *object_class_get_list(const char *implements_type,
                               bool include_abstract)
 {
@@ -1129,6 +1145,14 @@ void object_unref(Object *obj)
     }
 }
 
+// 给 obj 这个对象添加一个属性
+// @name: 属性名字, 即属性的 key
+// @type: 属性的类型。具体含义依赖于具体的属性。比如: %object_property_add_child
+// @opaque: 属性的 value
+//
+// 属性的 get/set/release 函数
+//
+// 最后将这个属性插入到 obj 保存属性的 hash table
 ObjectProperty *
 object_property_add(Object *obj, const char *name, const char *type,
                     ObjectPropertyAccessor *get,
@@ -1218,12 +1242,12 @@ ObjectProperty *object_property_find(Object *obj, const char *name,
     ObjectProperty *prop;
     ObjectClass *klass = object_get_class(obj);
 
-    prop = object_class_property_find(klass, name, NULL);
+    prop = object_class_property_find(klass, name, NULL);	// __极其极其关键__ 查找一个对象的属性的时候，先查找其类的公共属性
     if (prop) {
         return prop;
     }
 
-    prop = g_hash_table_lookup(obj->properties, name);
+    prop = g_hash_table_lookup(obj->properties, name);		// 然后才查找其自己的属性
     if (prop) {
         return prop;
     }
@@ -1232,6 +1256,7 @@ ObjectProperty *object_property_find(Object *obj, const char *name,
     return NULL;
 }
 
+// 用于遍历 property
 void object_property_iter_init(ObjectPropertyIterator *iter,
                                Object *obj)
 {
@@ -1313,7 +1338,7 @@ void object_property_get(Object *obj, Visitor *v, const char *name,
 void object_property_set(Object *obj, Visitor *v, const char *name,
                          Error **errp)
 {
-    ObjectProperty *prop = object_property_find(obj, name, errp);
+    ObjectProperty *prop = object_property_find(obj, name, errp);	// 极其关键
     if (prop == NULL) {
         return;
     }
@@ -1621,6 +1646,8 @@ const char *object_property_get_type(Object *obj, const char *name, Error **errp
     return prop->type;
 }
 
+// 整个 QOM 对象树的根？？？%container_info
+// 应该是整个 虚拟机的 根
 Object *object_get_root(void)
 {
     static Object *root;
@@ -1648,6 +1675,7 @@ Object *object_get_internal_root(void)
     return internal_root;
 }
 
+// 返回的时候 v 里保存了 child 信息(应该是一个 str 类型)
 static void object_get_child_property(Object *obj, Visitor *v,
                                       const char *name, void *opaque,
                                       Error **errp)
@@ -1656,7 +1684,7 @@ static void object_get_child_property(Object *obj, Visitor *v,
     gchar *path;
 
     path = object_get_canonical_path(child);
-    visit_type_str(v, name, &path, errp);
+    visit_type_str(v, name, &path, errp); // v 应该是一个 output visitor
     g_free(path);
 }
 
@@ -1677,6 +1705,9 @@ static void object_finalize_child_property(Object *obj, const char *name,
     object_unref(child);
 }
 
+// 添加一个 child
+// name 是 child 名
+// child 是 child 对象
 void object_property_add_child(Object *obj, const char *name,
                                Object *child, Error **errp)
 {
@@ -2206,6 +2237,7 @@ typedef struct BoolProperty
     void (*set)(Object *, bool, Error **);
 } BoolProperty;
 
+// v 里保存了获取的 bool 信息
 static void property_get_bool(Object *obj, Visitor *v, const char *name,
                               void *opaque, Error **errp)
 {
@@ -2222,6 +2254,7 @@ static void property_get_bool(Object *obj, Visitor *v, const char *name,
     visit_type_bool(v, name, &value, errp);
 }
 
+// v 里保存了需要写入的 bool 信息
 static void property_set_bool(Object *obj, Visitor *v, const char *name,
                               void *opaque, Error **errp)
 {

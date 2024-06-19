@@ -8,6 +8,7 @@
 #include "qemu/option.h"
 #include "qemu/config-file.h"
 
+// 保存的是所有合法的选项
 static QemuOptsList *vm_config_groups[48];
 static QemuOptsList *drive_config_groups[5];
 
@@ -39,6 +40,7 @@ QemuOptsList *qemu_find_opts(const char *group)
     return ret;
 }
 
+// singleton 表示找到一个就退出
 QemuOpts *qemu_find_opts_singleton(const char *group)
 {
     QemuOptsList *list;

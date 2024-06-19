@@ -39,6 +39,7 @@ typedef struct {
     bool compat_apic_id_mode;
 } X86MachineClass;
 
+// TYPE_X86_MACHINE
 typedef struct {
     /*< private >*/
     MachineState parent;
@@ -52,7 +53,7 @@ typedef struct {
     GMappedFile *initrd_mapped_file;
 
     /* Configuration options: */
-    uint64_t max_ram_below_4g;
+    uint64_t max_ram_below_4g;	// 低于 4g 部分的内存，最大只能有这么多
 
     /* RAM information (sizes, addresses, configuration): */
     ram_addr_t below_4g_mem_size, above_4g_mem_size;
@@ -121,6 +122,7 @@ bool x86_machine_is_acpi_enabled(X86MachineState *x86ms);
 
 #define GSI_NUM_PINS IOAPIC_NUM_PINS
 
+// PCI 中断不需要这些东西
 typedef struct GSIState {
     qemu_irq i8259_irq[ISA_NUM_IRQS];
     qemu_irq ioapic_irq[IOAPIC_NUM_PINS];

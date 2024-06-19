@@ -71,20 +71,59 @@ static const int ide_irq[MAX_IDE_BUS] = { 14, 15 };
 #endif
 
 /* PC hardware initialisation */
+// 设备树示例
+// ```
+//                 +-----------------+
+//                 | main-system-bus |
+//                 +--------+--------+
+//                          |
+//                          v
+//                 +--------+--------+
+//                 | i440FX-pcihost  |
+//                 +--------+--------+
+//                          |
+//                          v
+//                 +-------+-------+
+//                 |      pci.0    |
+//                 +---+---+---+---+
+//             +-------+   |   +------+
+//             v           v          v
+//         +------+     +-----+  +---------+
+//         |i440FX|     |PIIX3|  |piix3-ide|
+//         +------+     +--+--+  +----+----+
+//                         |
+//                         v
+//                     +---+----+
+//                     | isa.0  |	// isa bus 是挂载在 pci 设备 piix3 下面的
+//                     +---+----+
+//                         |
+//            +------------+-----------+---------+
+//            v            v           v         |
+//       +---------+  +---------+  +-------+  +------+
+//       |kvm-i8259|  |kvm-i8259|  |isa-fdc|  |kvm-pit|
+//       +----+----+  +---------+  +-------+  +---+--+
+// ```
+//
+// 一切都是设备，核心逻辑就是逐个创建主板上的各个设备
+// 特别的，对于 CPU 这个设备，需要启动 vcpu 线程的
+// 当然在此过程中，需要保存各种各样的配置信息
+//
+// 最终的设备树可以参考 Intel 440FX 架构图
+// 或者启动一个 qemu，然后在 hmp 里执行 info qtree 命令
 static void pc_init1(MachineState *machine,
                      const char *host_type, const char *pci_type)
 {
     PCMachineState *pcms = PC_MACHINE(machine);
     PCMachineClass *pcmc = PC_MACHINE_GET_CLASS(pcms);
-    X86MachineState *x86ms = X86_MACHINE(machine);
-    MemoryRegion *system_memory = get_system_memory();
-    MemoryRegion *system_io = get_system_io();
+    X86MachineState *x86ms = X86_MACHINE(machine);	// machine 相关的一系列结构
+    MemoryRegion *system_memory = get_system_memory(); // 最顶层的 MemoryRegion
+    MemoryRegion *system_io = get_system_io();	// 另一个最顶层的 memory Region
     PCIBus *pci_bus;
     ISABus *isa_bus;
-    PCII440FXState *i440fx_state;
+    PCII440FXState *i440fx_state;	// pci 设备的根
     int piix3_devfn = -1;
     qemu_irq smi_irq;
-    GSIState *gsi_state;
+    GSIState *gsi_state;	// 中断信息的根
     BusState *idebus[MAX_IDE_BUS];
     ISADevice *rtc_state;
     MemoryRegion *ram_memory;
@@ -123,6 +162,8 @@ static void pc_init1(MachineState *machine,
      *    qemu -M pc,max-ram-below-4g=2G -m 4G     -> 2048M low, 2048M high
      *    qemu -M pc,max-ram-below-4g=4G -m 3968M  -> 3968M low (=4G-128M)
      */
+    // 分别计算 高于/低于 4G 部分的内存大小
+    // 对于低于 4G 部分，最大只能安排 3.5G 的内存，因为需要预留一些给 pci设备 / bios 使用
     if (xen_enabled()) {
         xen_hvm_init(pcms, &ram_memory);
     } else {
@@ -153,15 +194,15 @@ static void pc_init1(MachineState *machine,
         }
     }
 
-    x86_cpus_init(x86ms, pcmc->default_cpu_version);
+    x86_cpus_init(x86ms, pcmc->default_cpu_version);	// 这里是 vcpu 线程创建的入口
 
-    if (kvm_enabled() && pcmc->kvmclock_enabled) {
+    if (kvm_enabled() && pcmc->kvmclock_enabled) {	// 一些 kvm 相关的操作咯
         kvmclock_create();
     }
 
     if (pcmc->pci_enabled) {
         pci_memory = g_new(MemoryRegion, 1);
-        memory_region_init(pci_memory, NULL, "pci", UINT64_MAX);
+        memory_region_init(pci_memory, NULL, "pci", UINT64_MAX);	// pci 使用的 meory 空间
         rom_memory = pci_memory;
     } else {
         pci_memory = NULL;
@@ -188,7 +229,7 @@ static void pc_init1(MachineState *machine,
         xen_load_linux(pcms);
     }
 
-    gsi_state = pc_gsi_create(&x86ms->gsi, pcmc->pci_enabled);
+    gsi_state = pc_gsi_create(&x86ms->gsi, pcmc->pci_enabled); // 保存 gsi 信息
 
     if (pcmc->pci_enabled) {
         PIIX3State *piix3;
@@ -212,9 +253,9 @@ static void pc_init1(MachineState *machine,
                               &error_abort);
         no_hpet = 1;
     }
-    isa_bus_irqs(isa_bus, x86ms->gsi);
+    isa_bus_irqs(isa_bus, x86ms->gsi); // isa 总线
 
-    pc_i8259_create(isa_bus, gsi_state->i8259_irq);
+    pc_i8259_create(isa_bus, gsi_state->i8259_irq); // 中断控制器的创建
 
     if (pcmc->pci_enabled) {
         ioapic_init_gsi(gsi_state, "i440fx");
@@ -224,7 +265,7 @@ static void pc_init1(MachineState *machine,
         x86_register_ferr_irq(x86ms->gsi[13]);
     }
 
-    pc_vga_init(isa_bus, pcmc->pci_enabled ? pci_bus : NULL);
+    pc_vga_init(isa_bus, pcmc->pci_enabled ? pci_bus : NULL); // vga
 
     assert(pcms->vmport != ON_OFF_AUTO__MAX);
     if (pcms->vmport == ON_OFF_AUTO_AUTO) {
@@ -232,16 +273,16 @@ static void pc_init1(MachineState *machine,
     }
 
     /* init basic PC hardware */
-    pc_basic_device_init(isa_bus, x86ms->gsi, &rtc_state, true,
+    pc_basic_device_init(isa_bus, x86ms->gsi, &rtc_state, true,	// rtc hpet 等设备初始化
                          (pcms->vmport != ON_OFF_AUTO_ON), pcms->pit_enabled,
                          0x4);
 
-    pc_nic_init(pcmc, isa_bus, pci_bus);
+    pc_nic_init(pcmc, isa_bus, pci_bus); // 网卡初始化
 
     if (pcmc->pci_enabled) {
         PCIDevice *dev;
 
-        dev = pci_create_simple(pci_bus, piix3_devfn + 1,
+        dev = pci_create_simple(pci_bus, piix3_devfn + 1,			// ide 初始化
                                 xen_enabled() ? "piix3-ide-xen" : "piix3-ide");
         pci_ide_create_devs(dev);
         idebus[0] = qdev_get_child_bus(&dev->qdev, "ide.0");
@@ -271,11 +312,11 @@ static void pc_init1(MachineState *machine,
     }
 #endif
 
-    if (pcmc->pci_enabled && machine_usb(machine)) {
+    if (pcmc->pci_enabled && machine_usb(machine)) {	// usb 初始化，现在都是挂在 pci bus 上了
         pci_create_simple(pci_bus, piix3_devfn + 2, "piix3-usb-uhci");
     }
 
-    if (pcmc->pci_enabled && x86_machine_is_acpi_enabled(X86_MACHINE(pcms))) {
+    if (pcmc->pci_enabled && x86_machine_is_acpi_enabled(X86_MACHINE(pcms))) {	// 电源管理模块
         DeviceState *piix4_pm;
 
         smi_irq = qemu_allocate_irq(pc_acpi_smi_interrupt, first_cpu, 0);
@@ -405,7 +446,7 @@ static void pc_xen_hvm_init(MachineState *machine)
         pc_init1(machine, TYPE_I440FX_PCI_HOST_BRIDGE, \
                  TYPE_I440FX_PCI_DEVICE); \
     } \
-    DEFINE_PC_MACHINE(suffix, name, pc_init_##suffix, optionfn)
+    DEFINE_PC_MACHINE(suffix, name, pc_init_##suffix, optionfn)		/* 注册了一个主板类型, 关键就是这里的 pc_init_##suffix 函数 */
 
 static void pc_i440fx_machine_options(MachineClass *m)
 {

@@ -1025,7 +1025,7 @@ void pc_memory_init(PCMachineState *pcms,
     }
 
     /* Initialize PC system firmware */
-    pc_system_firmware_init(pcms, rom_memory);
+    pc_system_firmware_init(pcms, rom_memory);	// 读取 bios 文件，然后将其设置到 ROM 对应的那一块内存里。后续启动虚拟机的时候，就是从这里开始执行的
 
     option_rom_mr = g_malloc(sizeof(*option_rom_mr));
     memory_region_init_ram(option_rom_mr, NULL, "pc.rom", PC_ROM_SIZE,
@@ -1101,8 +1101,8 @@ DeviceState *pc_vga_init(ISABus *isa_bus, PCIBus *pci_bus)
     DeviceState *dev = NULL;
 
     rom_set_order_override(FW_CFG_ORDER_OVERRIDE_VGA);
-    if (pci_bus) {
-        PCIDevice *pcidev = pci_vga_init(pci_bus);
+    if (pci_bus) { // 一般都是这里
+        PCIDevice *pcidev = pci_vga_init(pci_bus); // 创建 vga 设备
         dev = pcidev ? &pcidev->qdev : NULL;
     } else if (isa_bus) {
         ISADevice *isadev = isa_vga_init(isa_bus);
@@ -1979,6 +1979,8 @@ static void pc_machine_class_init(ObjectClass *oc, void *data)
         pc_machine_get_pit, pc_machine_set_pit, &error_abort);
 }
 
+
+// TYPE_OBJECT -> TYPE_MACHINE -> TYPE_X86_MACHINE -> TYPE_PC_MACHINE -> pc_machine_type_##suffix
 static const TypeInfo pc_machine_info = {
     .name = TYPE_PC_MACHINE,
     .parent = TYPE_X86_MACHINE,

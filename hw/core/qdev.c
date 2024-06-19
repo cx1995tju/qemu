@@ -888,7 +888,7 @@ static void device_set_realized(Object *obj, bool value, Error **errp)
         }
 
         if (dc->realize) {
-            dc->realize(dev, &local_err);
+            dc->realize(dev, &local_err);		// __HERE IT IS__ 	%x86_cpu_realizefn()
             if (local_err != NULL) {
                 goto fail;
             }
@@ -1190,6 +1190,7 @@ static void device_class_init(ObjectClass *class, void *data)
     dc->reset = device_phases_reset;
     rc->get_transitional_function = device_get_transitional_reset;
 
+    // 这里是关键, 对 class 增加了 realized 属性
     object_class_property_add_bool(class, "realized",
                                    device_get_realized, device_set_realized,
                                    &error_abort);
@@ -1227,7 +1228,7 @@ void device_class_set_parent_realize(DeviceClass *dc,
                                      DeviceRealize dev_realize,
                                      DeviceRealize *parent_realize)
 {
-    *parent_realize = dc->realize;
+    *parent_realize = dc->realize; // 将原本的 realize 保存起来作为 parent_realize 了
     dc->realize = dev_realize;
 }
 

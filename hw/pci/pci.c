@@ -1945,6 +1945,9 @@ PCIDevice *pci_nic_init_nofail(NICInfo *nd, PCIBus *rootbus,
     return pci_dev;
 }
 
+// 现在都是 pcie 的 switch 里会挂载一个 vga controller 的
+// 这个 vga controller 会请求必要的 port io / memory 空间的
+// vga 设备就是接到 vga controller 上，然后再通过 pcie bus 和 cpu 交互
 PCIDevice *pci_vga_init(PCIBus *bus)
 {
     switch (vga_interface_type) {
@@ -1953,7 +1956,7 @@ PCIDevice *pci_vga_init(PCIBus *bus)
     case VGA_QXL:
         return pci_create_simple(bus, -1, "qxl-vga");
     case VGA_STD:
-        return pci_create_simple(bus, -1, "VGA");
+        return pci_create_simple(bus, -1, "VGA"); // 一般这里, vga 设备挂载在 pci bus 上
     case VGA_VMWARE:
         return pci_create_simple(bus, -1, "vmware-svga");
     case VGA_VIRTIO:

@@ -75,12 +75,14 @@ struct KVMParkedVcpu {
     QLIST_ENTRY(KVMParkedVcpu) node;
 };
 
+// kvm ctx
+// 和内核 kvm 模块交互的 ctx
 struct KVMState
 {
     AccelState parent_obj;
 
     int nr_slots;
-    int fd;
+    int fd; // kvm fd, %kvm_init()
     int vmfd;
     int coalesced_mmio;
     int coalesced_pio;
@@ -98,7 +100,7 @@ struct KVMState
     int kvm_shadow_mem;
     bool kernel_irqchip_allowed;
     bool kernel_irqchip_required;
-    OnOffAuto kernel_irqchip_split;
+    OnOffAuto kernel_irqchip_split;	// 和 kernel_irqchip_allowed 一起决定 irqchip 是否让内核的 kvm 模拟
     bool sync_mmu;
     bool manual_dirty_log_protect;
     /* The man page (and posix) say ioctl numbers are signed int, but
@@ -122,13 +124,14 @@ struct KVMState
     int (*memcrypt_encrypt_data)(void *handle, uint8_t *ptr, uint64_t len);
 
     /* For "info mtree -f" to tell if an MR is registered in KVM */
-    int nr_as;
+    int nr_as;	// kvm 支持多少个 address space
     struct KVMAs {
         KVMMemoryListener *ml;
         AddressSpace *as;
-    } *as;
+    } *as; // nr_as 就是这个数组的长度
 };
 
+// 一堆全局变量，真丑
 KVMState *kvm_state;
 bool kvm_kernel_irqchip;
 bool kvm_split_irqchip;
@@ -1838,12 +1841,14 @@ static void kvm_irqchip_create(KVMState *s)
  * procedure from the kernel API documentation to cope with
  * older kernels that may be missing capabilities.
  */
+// linux:kvm-api.rst
 static int kvm_recommended_vcpus(KVMState *s)
 {
     int ret = kvm_vm_check_extension(s, KVM_CAP_NR_VCPUS);
     return (ret) ? ret : 4;
 }
 
+// linux:kvm-api.rst
 static int kvm_max_vcpus(KVMState *s)
 {
     int ret = kvm_check_extension(s, KVM_CAP_MAX_VCPUS);
@@ -1862,6 +1867,7 @@ bool kvm_vcpu_id_is_valid(int vcpu_id)
     return vcpu_id >= 0 && vcpu_id < kvm_max_vcpu_id(s);
 }
 
+// accel_init_machine() ->
 static int kvm_init(MachineState *ms)
 {
     MachineClass *mc = MACHINE_GET_CLASS(ms);
@@ -1908,7 +1914,7 @@ static int kvm_init(MachineState *ms)
     }
 
     ret = kvm_ioctl(s, KVM_GET_API_VERSION, 0);
-    if (ret < KVM_API_VERSION) {
+    if (ret < KVM_API_VERSION) { // refer to: linux://kvm_api.rst
         if (ret >= 0) {
             ret = -EINVAL;
         }
@@ -1922,7 +1928,7 @@ static int kvm_init(MachineState *ms)
         goto err;
     }
 
-    kvm_immediate_exit = kvm_check_extension(s, KVM_CAP_IMMEDIATE_EXIT);
+    kvm_immediate_exit = kvm_check_extension(s, KVM_CAP_IMMEDIATE_EXIT); // kvm_api.rst
     s->nr_slots = kvm_check_extension(s, KVM_CAP_NR_MEMSLOTS);
 
     /* If unspecified, use the default value */
@@ -1938,15 +1944,15 @@ static int kvm_init(MachineState *ms)
 
     kvm_type = qemu_opt_get(qemu_get_machine_opts(), "kvm-type");
     if (mc->kvm_type) {
-        type = mc->kvm_type(ms, kvm_type);
-    } else if (kvm_type) {
+        type = mc->kvm_type(ms, kvm_type);	// 不进来
+    } else if (kvm_type) { // 不进来
         ret = -EINVAL;
         fprintf(stderr, "Invalid argument kvm-type=%s\n", kvm_type);
         goto err;
     }
 
     do {
-        ret = kvm_ioctl(s, KVM_CREATE_VM, type);
+        ret = kvm_ioctl(s, KVM_CREATE_VM, type); // __HERE IT IS__ 返回的 ret 就是后续用来操作 VM 的
     } while (ret == -EINTR);
 
     if (ret < 0) {
@@ -1972,10 +1978,10 @@ static int kvm_init(MachineState *ms)
     s->vmfd = ret;
 
     /* check the vcpu limits */
-    soft_vcpus_limit = kvm_recommended_vcpus(s);
+    soft_vcpus_limit = kvm_recommended_vcpus(s); // 这是从 kvm 里获取的 kvm 侧的限制
     hard_vcpus_limit = kvm_max_vcpus(s);
 
-    while (nc->name) {
+    while (nc->name) { // nc 记录的是 qemu 侧的 cpu 限制；比如是通过参数传递进来的
         if (nc->num > soft_vcpus_limit) {
             warn_report("Number of %s cpus requested (%d) exceeds "
                         "the recommended cpus supported by KVM (%d)",
@@ -1991,6 +1997,7 @@ static int kvm_init(MachineState *ms)
         nc++;
     }
 
+    // 检查一些必须的 capabilities kvm 是否都支持了
     missing_cap = kvm_check_extension_list(s, kvm_required_capabilites);
     if (!missing_cap) {
         missing_cap =
@@ -2008,7 +2015,7 @@ static int kvm_init(MachineState *ms)
                        kvm_check_extension(s, KVM_CAP_COALESCED_PIO);
 
     s->manual_dirty_log_protect =
-        kvm_check_extension(s, KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2);
+        kvm_check_extension(s, KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2); // 让 qemu 自己来控制 dirty log
     if (s->manual_dirty_log_protect) {
         ret = kvm_vm_enable_cap(s, KVM_CAP_MANUAL_DIRTY_LOG_PROTECT2, 0, 1);
         if (ret) {
@@ -2076,12 +2083,14 @@ static int kvm_init(MachineState *ms)
         kvm_state->memcrypt_encrypt_data = sev_encrypt_data;
     }
 
+    // 前面主要就是检查内核 kvm 中各种 feature 的支持情况
+    // 这里差不多，不过检查的 feature 是 arch-specific 的
     ret = kvm_arch_init(ms, s);
     if (ret < 0) {
         goto err;
     }
 
-    if (s->kernel_irqchip_split == ON_OFF_AUTO_AUTO) {
+    if (s->kernel_irqchip_split == ON_OFF_AUTO_AUTO) { // refer to: kernel-irqchip 参数
         s->kernel_irqchip_split = mc->default_kernel_irqchip_split ? ON_OFF_AUTO_ON : ON_OFF_AUTO_OFF;
     }
 

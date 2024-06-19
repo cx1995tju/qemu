@@ -32,6 +32,8 @@ static void __attribute__((constructor)) do_qemu_init_ ## function(void)    \
 }
 #else
 /* This should not be used directly.  Use block_init etc. instead.  */
+// 通过 constructor 机制来注册函数
+// 然后在启动的时候通过 module_call_init 调用注册的函数，完成初始化
 #define module_init(function, type)                                         \
 static void __attribute__((constructor)) do_qemu_init_ ## function(void)    \
 {                                                                           \
@@ -42,7 +44,7 @@ static void __attribute__((constructor)) do_qemu_init_ ## function(void)    \
 typedef enum {
     MODULE_INIT_MIGRATION,
     MODULE_INIT_BLOCK,
-    MODULE_INIT_OPTS,
+    MODULE_INIT_OPTS, // opts_init 会注册函数的
     MODULE_INIT_QOM,
     MODULE_INIT_TRACE,
     MODULE_INIT_XEN_BACKEND,

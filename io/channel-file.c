@@ -213,7 +213,7 @@ static void qio_channel_file_class_init(ObjectClass *klass,
     ioc_klass->io_set_blocking = qio_channel_file_set_blocking;
     ioc_klass->io_seek = qio_channel_file_seek;
     ioc_klass->io_close = qio_channel_file_close;
-    ioc_klass->io_create_watch = qio_channel_file_create_watch;
+    ioc_klass->io_create_watch = qio_channel_file_create_watch; // 本质就是创建了一个事件源
     ioc_klass->io_set_aio_fd_handler = qio_channel_file_set_aio_fd_handler;
 }
 

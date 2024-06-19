@@ -1215,6 +1215,9 @@ static void qemu_wait_io_event(CPUState *cpu)
     qemu_wait_io_event_common(cpu);
 }
 
+// refer to: linux:kvm/api.rst
+// vcpu fd 后续的操作都应该是创建 vcpu 的线程来进行。
+// 所以这里先启动 vcpu 线程，然后让其和 kvm 交互创建 vcpufd
 static void *qemu_kvm_cpu_thread_fn(void *arg)
 {
     CPUState *cpu = arg;
@@ -1241,14 +1244,14 @@ static void *qemu_kvm_cpu_thread_fn(void *arg)
     qemu_cond_signal(&qemu_cpu_cond);
     qemu_guest_random_seed_thread_part2(cpu->random_seed);
 
-    do {
+    do {	// __HERE__ 这里就是 vcpu 的主循环逻辑了
         if (cpu_can_run(cpu)) {
-            r = kvm_cpu_exec(cpu);
+            r = kvm_cpu_exec(cpu);	// 这里面陷入到 kvm 里运行，并且在 kvm_run 退出的时候处理 io 事件
             if (r == EXCP_DEBUG) {
                 cpu_handle_guest_debug(cpu);
             }
         }
-        qemu_wait_io_event(cpu);
+        qemu_wait_io_event(cpu); // 这里等待 io 事件处理完
     } while (!cpu->unplug || cpu_can_run(cpu));
 
     qemu_kvm_destroy_vcpu(cpu);
@@ -2004,7 +2007,7 @@ static void qemu_kvm_start_vcpu(CPUState *cpu)
     qemu_cond_init(cpu->halt_cond);
     snprintf(thread_name, VCPU_THREAD_NAME_SIZE, "CPU %d/KVM",
              cpu->cpu_index);
-    qemu_thread_create(cpu->thread, thread_name, qemu_kvm_cpu_thread_fn,
+    qemu_thread_create(cpu->thread, thread_name, qemu_kvm_cpu_thread_fn,	// 创建 vcpu 线程
                        cpu, QEMU_THREAD_JOINABLE);
 }
 
@@ -2075,7 +2078,7 @@ void qemu_init_vcpu(CPUState *cpu)
     if (kvm_enabled()) {
         qemu_kvm_start_vcpu(cpu);
     } else if (hax_enabled()) {
-        qemu_hax_start_vcpu(cpu);
+        qemu_hax_start_vcpu(cpu);	// __HERE IT IS__
     } else if (hvf_enabled()) {
         qemu_hvf_start_vcpu(cpu);
     } else if (tcg_enabled()) {

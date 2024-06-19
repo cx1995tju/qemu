@@ -21,6 +21,8 @@
 #define I440FX_PCI_DEVICE(obj) \
     OBJECT_CHECK(PCII440FXState, (obj), TYPE_I440FX_PCI_DEVICE)
 
+// i440fx_info
+// PCI 设备的 根
 typedef struct PCII440FXState {
     /*< private >*/
     PCIDevice parent_obj;

@@ -256,7 +256,7 @@ GSource *qio_channel_create_fd_watch(QIOChannel *ioc,
     GSource *source;
     QIOChannelFDSource *ssource;
 
-    source = g_source_new(&qio_channel_fd_source_funcs,
+    source = g_source_new(&qio_channel_fd_source_funcs, // 创建了事件源，对应的函数是 qio_channel_fd_source_funcs
                           sizeof(QIOChannelFDSource));
     ssource = (QIOChannelFDSource *)source;
 
@@ -272,7 +272,7 @@ GSource *qio_channel_create_fd_watch(QIOChannel *ioc,
 #endif
     ssource->fd.events = condition;
 
-    g_source_add_poll(source, &ssource->fd);
+    g_source_add_poll(source, &ssource->fd); // 这个事件源关联了 fd 的
 
     return source;
 }

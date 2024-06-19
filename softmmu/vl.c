@@ -515,6 +515,7 @@ static void res_free(void)
     boot_splash_filedata = NULL;
 }
 
+// 判断每个 device 的 default driver
 static int default_driver_check(void *opaque, QemuOpts *opts, Error **errp)
 {
     const char *driver = qemu_opt_get(opts, "driver");
@@ -829,6 +830,11 @@ static void configure_rtc_base_datetime(const char *startdate)
     rtc_ref_start_datetime = rtc_start_datetime;
 }
 
+// 示例: -rtc base=utc,driftfix=slew 
+// 就是记录一些 rtc 相关的配置咯
+// %rtc_base_type
+// %rtc_clock
+// %object_compat_props
 static void configure_rtc(QemuOpts *opts)
 {
     const char *value;
@@ -839,7 +845,7 @@ static void configure_rtc(QemuOpts *opts)
     rtc_realtime_clock_offset = qemu_clock_get_ms(QEMU_CLOCK_REALTIME) / 1000;
 
     value = qemu_opt_get(opts, "base");
-    if (value) {
+    if (value) {	// rtc_base_type
         if (!strcmp(value, "utc")) {
             rtc_base_type = RTC_BASE_UTC;
         } else if (!strcmp(value, "localtime")) {
@@ -1186,6 +1192,8 @@ static int machine_help_func(QemuOpts *opts, MachineState *machine)
         return 0;
     }
 
+    // 打印对应 machine 类型的 help 文档, help 文档是通过 machine 类型的 property 来实时构建的。 显然不同 machine 类型是不同的。
+    // 示例: qemu-system-x86_64 -machine pc-i440fx-2.8,help
     object_property_iter_init(&iter, OBJECT(machine));
     while ((prop = object_property_iter_next(&iter))) {
         if (!prop->set) {
@@ -1597,7 +1605,7 @@ static bool main_loop_should_exit(void)
     RunState r;
     ShutdownCause request;
 
-    if (preconfig_exit_requested) {
+    if (preconfig_exit_requested) { // 第一次进来会从这里退出
         if (runstate_check(RUN_STATE_PRECONFIG)) {
             runstate_set(RUN_STATE_PRELAUNCH);
         }
@@ -1657,6 +1665,8 @@ void qemu_main_loop(void)
 #ifdef CONFIG_PROFILER
     int64_t ti;
 #endif
+    // 第一次进来这个函数的时候会直接退出 qemu_init() -> qemu_main_loop()
+    // 第二次进入的时候才会死循环 main() -> qemu_main_loop()
     while (!main_loop_should_exit()) {
 #ifdef CONFIG_PROFILER
         ti = profile_getclock();
@@ -2371,6 +2381,11 @@ static void qemu_run_machine_init_done_notifiers(void)
     notifier_list_notify(&machine_init_done_notifiers, NULL);
 }
 
+// 返回的 *potparg 是当前选项的选项值
+// 返回的 QEMUOption * 是对应的选项的信息
+// 比如：-drive file=/home/chengxin/debian-10-nocloud-amd64-20230917-1506.qcow2,format=qcow2,if=none,id=drive-ide0-0-0
+// QEMUOption * 对应返回的是 main 函数里通过 qemu_add_opts() 添加的 qemu_drive_opts 结构。里面保存了选项的 metadata
+// popptarg 保存的是 file=/home/chengxin/debian-10-nocloud-amd64-20230917-1506.qcow2,format=qcow2,if=none,id=drive-ide0-0-0。即选项的值
 static const QEMUOption *lookup_opt(int argc, char **argv,
                                     const char **poptarg, int *poptind)
 {
@@ -2382,51 +2397,53 @@ static const QEMUOption *lookup_opt(int argc, char **argv,
     loc_set_cmdline(argv, optind, 1);
     optind++;
     /* Treat --foo the same as -foo.  */
-    if (r[1] == '-')
+    if (r[1] == '-') // 处理下 -- 这种情况
         r++;
-    popt = qemu_options;
+    popt = qemu_options; // 指向一个合法的匹配 argv 的选项
     for(;;) {
         if (!popt->name) {
             error_report("invalid option");
             exit(1);
         }
-        if (!strcmp(popt->name, r + 1))
-            break;
+        if (!strcmp(popt->name, r + 1))	// r + 1 指向的就是选项名。比如 drive
+            break; // 匹配上了
         popt++;
     }
     if (popt->flags & HAS_ARG) {
-        if (optind >= argc) {
+        if (optind >= argc) { // 到达末尾了，但是没有参数。optind 在前面已经 ++ 了，此时应该已经指向了 选项参数了。qumu 的选项参数都是 [k0=]v0,k1=v1,k2=v2,...,kn=vn 的形式。第 0 个 key 可以省略
             error_report("requires an argument");
             exit(1);
         }
-        optarg = argv[optind++];
+        optarg = argv[optind++]; // optind 已经指向下一个选项了
         loc_set_cmdline(argv, optind - 2, 2);
     } else {
         optarg = NULL;
     }
 
-    *poptarg = optarg;
-    *poptind = optind;
+    *poptarg = optarg; // 将当前处理的命令行里的选项值返回
+    *poptind = optind; // 将下一个选项的 index 返回
 
-    return popt;
+    return popt; // 这里将当前找到的合法选项返回
 }
 
+// 根据解析保存的 -machine 参数找到对应的 machine_class
 static MachineClass *select_machine(void)
 {
-    GSList *machines = object_class_get_list(TYPE_MACHINE, false);
+    GSList *machines = object_class_get_list(TYPE_MACHINE, false); // 所有 继承 TYEP_MACHINE 的类都挂在这个 list 上？
     MachineClass *machine_class = find_default_machine(machines);
     const char *optarg;
-    QemuOpts *opts;
+    QemuOpts *opts; // 保存获取的 machine opts
     Location loc;
 
     loc_push_none(&loc);
 
-    opts = qemu_get_machine_opts();
+    opts = qemu_get_machine_opts(); // 在 vl.c:qemu_init() 里解析 -machine 参数添加过来的
     qemu_opts_loc_restore(opts);
 
-    optarg = qemu_opt_get(opts, "type");
-    if (optarg) {
-        machine_class = machine_parse(optarg, machines);
+    // 找出其中最重要的 type=xxx
+    optarg = qemu_opt_get(opts, "type"); // -machine [type=]pc-i440fx-5.0,accel=kvm,usb=off,dump-guest-core=off
+    if (optarg) { // 找到 type 后，就去解析咯, 然后找到对应的 machine class 结构
+        machine_class = machine_parse(optarg, machines); // 找到了 machine_class 结构
     }
 
     if (!machine_class) {
@@ -2560,13 +2577,17 @@ static bool object_create_delayed(const char *type, QemuOpts *opts)
 }
 
 
+// 解析的信息会保存在下述位置:
+// slots 信息 ram_slots
+// maxmem 信息，maxram_size
+// size 信息，又保存回 opts 中了, 在这个过程中可能做了修正，即保存回去的值和原始值可能不同了
 static bool set_memory_options(uint64_t *ram_slots, ram_addr_t *maxram_size,
                                MachineClass *mc)
 {
     uint64_t sz;
     const char *mem_str;
     const ram_addr_t default_ram_size = mc->default_ram_size;
-    QemuOpts *opts = qemu_find_opts_singleton("memory");
+    QemuOpts *opts = qemu_find_opts_singleton("memory"); // -m 参数 %QEMU_OPTION_m  示例: -m [size=]megs[,slots=n,maxmem=size]
     Location loc;
 
     loc_push_none(&loc);
@@ -2580,9 +2601,10 @@ static bool set_memory_options(uint64_t *ram_slots, ram_addr_t *maxram_size,
             exit(EXIT_FAILURE);
         }
 
-        sz = qemu_opt_get_size(opts, "size", ram_size);
+        sz = qemu_opt_get_size(opts, "size", ram_size); // 获取 size 参数，并转换为 u64
 
         /* Fix up legacy suffix-less format */
+	// 一些合法性检查而已
         if (g_ascii_isdigit(mem_str[strlen(mem_str) - 1])) {
             uint64_t overflow_check = sz;
 
@@ -2599,21 +2621,21 @@ static bool set_memory_options(uint64_t *ram_slots, ram_addr_t *maxram_size,
         sz = default_ram_size;
     }
 
-    sz = QEMU_ALIGN_UP(sz, 8192);
-    if (mc->fixup_ram_size) {
+    sz = QEMU_ALIGN_UP(sz, 8192); // 8k 对齐
+    if (mc->fixup_ram_size) {	// 老的机器类型，对于有些 ram 大小不支持的。使用这个函数修正一下用户传入的参数。
         sz = mc->fixup_ram_size(sz);
     }
     ram_size = sz;
-    if (ram_size != sz) {
+    if (ram_size != sz) {	// why???? 怎么可能？？？
         error_report("ram size too large");
         exit(EXIT_FAILURE);
     }
 
     /* store value for the future use */
-    qemu_opt_set_number(opts, "size", ram_size, &error_abort);
+    qemu_opt_set_number(opts, "size", ram_size, &error_abort); // 反过来用 ram_size 去修改 opt 中的值。后续别的模块直接从 opt 拿信息的时候，拿到的就是修改后的信息了。
     *maxram_size = ram_size;
 
-    if (qemu_opt_get(opts, "maxmem")) {
+    if (qemu_opt_get(opts, "maxmem")) { // 处理 maxmem k-v 对。maxmem 在 memory hotplug 场景来限制 memory 的使用
         uint64_t slots;
 
         sz = qemu_opt_get_size(opts, "maxmem", 0);
@@ -2669,7 +2691,8 @@ static int qemu_read_default_config_file(void)
 
 static void user_register_global_props(void)
 {
-    qemu_opts_foreach(qemu_find_opts("global"),
+	// 遍历所有的 global 选项，搜集 k-v 信息，然后保存到一个全局变量中
+    qemu_opts_foreach(qemu_find_opts("global"), // %qemu_global_opts %QEMU_OPTION_global  %qemu -global help 命令查看
                       global_init_func, NULL, NULL);
 }
 
@@ -2716,6 +2739,7 @@ static int do_configure_accelerator(void *opaque, QemuOpts *opts, Error **errp)
     return 1;
 }
 
+// kvm 处理的入口
 static void configure_accelerators(const char *progname)
 {
     const char *accel;
@@ -2772,6 +2796,7 @@ static void configure_accelerators(const char *progname)
         }
     }
 
+    // __HERE IT IS__
     if (!qemu_opts_foreach(qemu_find_opts("accel"),
                            do_configure_accelerator, &init_failed, &error_fatal)) {
         if (!init_failed) {
@@ -2827,7 +2852,7 @@ void qemu_init(int argc, char **argv, char **envp)
     int optind;
     const char *optarg;
     const char *loadvm = NULL;
-    MachineClass *machine_class;
+    MachineClass *machine_class;	// 核心
     const char *cpu_option;
     const char *vga_model = NULL;
     const char *qtest_chrdev = NULL;
@@ -2868,7 +2893,8 @@ void qemu_init(int argc, char **argv, char **envp)
     module_call_init(MODULE_INIT_QOM);
     module_call_init(MODULE_INIT_MIGRATION);
 
-    qemu_add_opts(&qemu_drive_opts);
+    // 这里仅仅是在 初始化 vm_config_groups 数组
+    qemu_add_opts(&qemu_drive_opts); // 镜像
     qemu_add_drive_opts(&qemu_legacy_drive_opts);
     qemu_add_drive_opts(&qemu_common_drive_opts);
     qemu_add_drive_opts(&qemu_drive_opts);
@@ -2925,15 +2951,18 @@ void qemu_init(int argc, char **argv, char **envp)
     autostart = 1;
 
     /* first pass of option parsing */
+    // 第一次遍历选项，
+    // 一是检查下合法性, 没有做太多事情
+    // 二是找一下有没有 no-user-config，来决定是否加载默认的配置文件
     optind = 1;
     while (optind < argc) {
         if (argv[optind][0] != '-') {
             /* disk image */
             optind++;
-        } else {
+        } else { // 参数都是 - 开头的
             const QEMUOption *popt;
 
-            popt = lookup_opt(argc, argv, &optarg, &optind);
+            popt = lookup_opt(argc, argv, &optarg, &optind);	// 这里才是真正的参数解析。但是对于返回的 optarg / popt 没有做进一步处理
             switch (popt->index) {
             case QEMU_OPTION_nouserconfig:
                 userconfig = false;
@@ -2949,6 +2978,8 @@ void qemu_init(int argc, char **argv, char **envp)
     }
 
     /* second pass of option parsing */
+    // 这一次解析要做正经事情了。主要是将 lookup_opt 返回的 optarg 里的 k-v 对解析出来。然后保存为
+    // QemuOpts / QemuOpt 结构。供后续各个子系统使用 qemu_find_opts() 查找选项使用选项
     optind = 1;
     for(;;) {
         if (optind >= argc)
@@ -3450,9 +3481,9 @@ void qemu_init(int argc, char **argv, char **envp)
                 qemu_opts_parse_noisily(olist, "accel=kvm", false);
                 break;
             case QEMU_OPTION_M:
-            case QEMU_OPTION_machine:
+            case QEMU_OPTION_machine: // -machine [type=]pc-i440fx-5.0,accel=kvm,usb=off,dump-guest-core=off 
                 olist = qemu_find_opts("machine");
-                opts = qemu_opts_parse_noisily(olist, optarg, true);
+                opts = qemu_opts_parse_noisily(olist, optarg, true); // 仅仅解析后，保存了参数，什么工作都还没有做
                 if (!opts) {
                     exit(1);
                 }
@@ -3508,8 +3539,8 @@ void qemu_init(int argc, char **argv, char **envp)
                     exit(1);
                 }
                 break;
-            case QEMU_OPTION_smp:
-                if (!qemu_opts_parse_noisily(qemu_find_opts("smp-opts"),
+            case QEMU_OPTION_smp: // 命令行参数的 -smp 保存到的 QemuOpts 其 name 是 smp-opts
+                if (!qemu_opts_parse_noisily(qemu_find_opts("smp-opts"), // -smp
                                              optarg, true)) {
                     exit(1);
                 }
@@ -3801,7 +3832,7 @@ void qemu_init(int argc, char **argv, char **envp)
      * type and the user did not specify one, so that the user doesn't need
      * to say '-cpu help -machine something'.
      */
-    if (cpu_option && is_help_option(cpu_option)) {
+    if (cpu_option && is_help_option(cpu_option)) { // 对于 -cpu 参数，检查是不是使用 help 来启动的。`qemu -cpu help`
         list_cpus(cpu_option);
         exit(0);
     }
@@ -3815,21 +3846,22 @@ void qemu_init(int argc, char **argv, char **envp)
 
     replay_configure(icount_opts);
 
+    // 热迁移 和 preconfig_exit_requested 两个选项是互斥的
     if (incoming && !preconfig_exit_requested) {
         error_report("'preconfig' and 'incoming' options are "
                      "mutually exclusive");
         exit(EXIT_FAILURE);
     }
 
-    configure_rtc(qemu_find_opts_singleton("rtc"));
+    configure_rtc(qemu_find_opts_singleton("rtc")); // 示例:  -rtc base=utc,driftfix=slew 
 
-    machine_class = select_machine();
+    machine_class = select_machine(); // 后面会用这个 machine_class 来创建对象	// HERE_IT_IS, 创建代表整个虚拟机的结构了
     object_set_machine_compat_props(machine_class->compat_props);
 
-    have_custom_ram_size = set_memory_options(&ram_slots, &maxram_size,
+    have_custom_ram_size = set_memory_options(&ram_slots, &maxram_size, // 解析 -m 参数，并将解析的结果在某些地方保存起来
                                               machine_class);
 
-    os_daemonize();
+    os_daemonize(); // 转换为守护进程咯
 
     /*
      * If QTest is enabled, keep the rcu_atfork enabled, since system processes
@@ -3848,9 +3880,9 @@ void qemu_init(int argc, char **argv, char **envp)
     }
 
     qemu_unlink_pidfile_notifier.notify = qemu_unlink_pidfile;
-    qemu_add_exit_notifier(&qemu_unlink_pidfile_notifier);
+    qemu_add_exit_notifier(&qemu_unlink_pidfile_notifier); // qemu 退出的时候会调用的
 
-    if (qemu_init_main_loop(&main_loop_err)) {
+    if (qemu_init_main_loop(&main_loop_err)) {	// HERE IT IS
         error_report_err(main_loop_err);
         exit(1);
     }
@@ -3862,7 +3894,7 @@ void qemu_init(int argc, char **argv, char **envp)
     }
 #endif
 
-    qemu_opts_foreach(qemu_find_opts("name"),
+    qemu_opts_foreach(qemu_find_opts("name"), // 虚拟机名字, 线程名字等
                       parse_name, NULL, &error_fatal);
 
 #ifndef _WIN32
@@ -3873,18 +3905,39 @@ void qemu_init(int argc, char **argv, char **envp)
                       cleanup_add_fd, NULL, &error_fatal);
 #endif
 
-    current_machine = MACHINE(object_new_with_class(OBJECT_CLASS(machine_class)));
+    /* HERE IT IS */
+    current_machine = MACHINE(object_new_with_class(OBJECT_CLASS(machine_class))); // 使用 machine_class 创建一个对象咯，并强制转换了
     if (machine_help_func(qemu_get_machine_opts(), current_machine)) {
         exit(0);
     }
+    // 连接到 hmp后，使用 info qom-tree 可以看到如下层次结构
+// machine (pc-i440fx-5.0-machine)
+//   /unattached (container)
+//     /device[45] (i8042)
+//       /i8042-cmd[0] (qemu:memory-region)
+//       /i8042-data[0] (qemu:memory-region)
+//     /non-qdev-gpio[24] (irq)
+//     /device[14] (Skylake-Server-IBRS-x86_64-cpu)
+//       /lapic (kvm-apic)
+//         /kvm-apic-msi[0] (qemu:memory-region)
+//     /non-qdev-gpio[3] (irq)
+//     /device[9] (Skylake-Server-IBRS-x86_64-cpu)
+//       /lapic (kvm-apic)
+//         /kvm-apic-msi[0] (qemu:memory-region)
+//         ...
+//         ...
+//         ...
+//         ...
+    // root 添加了一个 child，名为 machine，key 为 current_machine
     object_property_add_child(object_get_root(), "machine",
                               OBJECT(current_machine), &error_abort);
+    // 给 current_machine 的 container，也就是前面的 root 添加一个 sysbus child
     object_property_add_child(container_get(OBJECT(current_machine),
                                             "/unattached"),
                               "sysbus", OBJECT(sysbus_get_default()),
                               NULL);
 
-    if (machine_class->minimum_page_bits) {
+    if (machine_class->minimum_page_bits) {  // refer to: struct MachineClass
         if (!set_preferred_target_page_bits(machine_class->minimum_page_bits)) {
             /* This would be a board error: specifying a minimum smaller than
              * a target's compile-time fixed setting.
@@ -3920,6 +3973,8 @@ void qemu_init(int argc, char **argv, char **envp)
     }
 
     /* add configured firmware directories */
+    // firmware path 可能是用 : 分割的多个路径构成的字符串
+    // 保存 firmware 信息
     dirs = g_strsplit(CONFIG_QEMU_FIRMWAREPATH, G_SEARCHPATH_SEPARATOR_S, 0);
     for (i = 0; dirs[i] != NULL; i++) {
         qemu_add_data_dir(dirs[i]);
@@ -3927,14 +3982,15 @@ void qemu_init(int argc, char **argv, char **envp)
     g_strfreev(dirs);
 
     /* try to find datadir relative to the executable path */
-    dir = os_find_datadir();
-    qemu_add_data_dir(dir);
+    dir = os_find_datadir(); // 找路径
+    qemu_add_data_dir(dir); // 保存路径
     g_free(dir);
 
     /* add the datadir specified when building */
     qemu_add_data_dir(CONFIG_QEMU_DATADIR);
 
     /* -L help lists the data directories and exits. */
+    // qemu-system-x86_64 -L help 可以查看到相关目录
     if (list_data_dirs) {
         for (i = 0; i < data_dir_idx; i++) {
             printf("%s\n", data_dir[i]);
@@ -3942,12 +3998,15 @@ void qemu_init(int argc, char **argv, char **envp)
         exit(0);
     }
 
+    // machine_class 的各种基础信息保存
     /* machine_class: default to UP */
+    // 类信息修正
     machine_class->max_cpus = machine_class->max_cpus ?: 1;
     machine_class->min_cpus = machine_class->min_cpus ?: 1;
     machine_class->default_cpus = machine_class->default_cpus ?: 1;
 
     /* default to machine_class->default_cpus */
+    // current_machine 这个对象的基本设置
     current_machine->smp.cpus = machine_class->default_cpus;
     current_machine->smp.max_cpus = machine_class->default_cpus;
     current_machine->smp.cores = 1;
@@ -3955,8 +4014,9 @@ void qemu_init(int argc, char **argv, char **envp)
     current_machine->smp.sockets = 1;
 
     machine_class->smp_parse(current_machine,
-        qemu_opts_find(qemu_find_opts("smp-opts"), NULL));
+        qemu_opts_find(qemu_find_opts("smp-opts"), NULL)); // 对应的是命令行 -smp 参数
 
+    // 完成了 smp 解析后，检查下解析后的结果是否合法
     /* sanity-check smp_cpus and max_cpus against machine_class */
     if (current_machine->smp.cpus < machine_class->min_cpus) {
         error_report("Invalid SMP CPUs %d. The min CPUs "
@@ -3973,7 +4033,7 @@ void qemu_init(int argc, char **argv, char **envp)
         exit(1);
     }
 
-    if (mem_prealloc) {
+    if (mem_prealloc) { // 是否要提前分配 guest 需要的内存。一般都会。
         char *val;
 
         val = g_strdup_printf("%d", current_machine->smp.cpus);
@@ -3986,6 +4046,7 @@ void qemu_init(int argc, char **argv, char **envp)
      * Get the default machine options from the machine if it is not already
      * specified either by the configuration file or by the command line.
      */
+    // 有一些 default 选项的话，就设置好。 % pc_i440fx_machine_options
     if (machine_class->default_machine_opts) {
         qemu_opts_set_defaults(qemu_find_opts("machine"),
                                machine_class->default_machine_opts, 0);
@@ -3996,14 +4057,17 @@ void qemu_init(int argc, char **argv, char **envp)
         exit(1);
     }
 
-    qemu_opts_foreach(qemu_find_opts("device"),
+    /* HERE IT IS */
+    qemu_opts_foreach(qemu_find_opts("device"),	// 对所有 device 选项做 check
                       default_driver_check, NULL, NULL);
-    qemu_opts_foreach(qemu_find_opts("global"),
+    qemu_opts_foreach(qemu_find_opts("global"), // 对所有 global 选项做 check
                       default_driver_check, NULL, NULL);
 
     if (!vga_model && !default_vga) {
         vga_interface_type = VGA_DEVICE;
     }
+
+    // 是否创建一些默认设备, 如果设置了 -nodefaults 参数的话，就不会创建了
     if (!has_defaults || machine_class->no_serial) {
         default_serial = 0;
     }
@@ -4101,6 +4165,7 @@ void qemu_init(int argc, char **argv, char **envp)
                      "ignoring option");
     }
 
+    // display / console 初始化
     qemu_display_early_init(&dpy);
     qemu_console_early_init();
 
@@ -4116,10 +4181,12 @@ void qemu_init(int argc, char **argv, char **envp)
     page_size_init();
     socket_init();
 
+    // -object 参数处理
     qemu_opts_foreach(qemu_find_opts("object"),
                       user_creatable_add_opts_foreach,
                       object_create_initial, &error_fatal);
 
+    // -chardev 参数处理
     qemu_opts_foreach(qemu_find_opts("chardev"),
                       chardev_init_func, NULL, &error_fatal);
     /* now chardevs have been created we may have semihosting to connect */
@@ -4135,10 +4202,11 @@ void qemu_init(int argc, char **argv, char **envp)
      * machine_set_property(), so machine properties can refer to
      * them.
      */
+    // block 设备相关处理
     configure_blockdev(&bdo_queue, machine_class, snapshot);
 
     machine_opts = qemu_get_machine_opts();
-    qemu_opt_foreach(machine_opts, machine_set_property, current_machine,
+    qemu_opt_foreach(machine_opts, machine_set_property, current_machine, // 解析 machine 选项，为 current_machine 对象设置一些属性
                      &error_fatal);
     current_machine->ram_size = ram_size;
     current_machine->maxram_size = maxram_size;
@@ -4148,7 +4216,8 @@ void qemu_init(int argc, char **argv, char **envp)
      * Note: uses machine properties such as kernel-irqchip, must run
      * after machine_set_property().
      */
-    configure_accelerators(argv[0]);
+    // %kvm_accel_type
+    configure_accelerators(argv[0]);	// __HERE IT IS__
 
     /*
      * Beware, QOM objects created before this point miss global and
@@ -4257,6 +4326,7 @@ void qemu_init(int argc, char **argv, char **envp)
     ram_mig_init();
     dirty_bitmap_mig_init();
 
+    // -mon 参数处理
     qemu_opts_foreach(qemu_find_opts("mon"),
                       mon_init_func, NULL, &error_fatal);
 
@@ -4342,8 +4412,9 @@ void qemu_init(int argc, char **argv, char **envp)
 
     audio_init_audiodevs();
 
+    // 前面准备好了一堆设备了。这里开始初始化主板, 可以理解为给主板通电了
     /* from here on runstate is RUN_STATE_PRELAUNCH */
-    machine_run_board_init(current_machine);
+    machine_run_board_init(current_machine);		// __HERE IT IS__ 最关键的 pc_init1 初始化
 
     realtime_init();
 

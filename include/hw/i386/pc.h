@@ -19,6 +19,7 @@
  * @boot_cpus: number of present VCPUs
  * @smp_dies: number of dies per one package
  */
+// TYPE_PC_MACHINE
 struct PCMachineState {
     /*< private >*/
     X86MachineState parent_obj;
@@ -73,6 +74,7 @@ struct PCMachineState {
  *                  way we can use 1GByte pages in the host.
  *
  */
+// TYPE_PC_MACHINE
 typedef struct PCMachineClass {
     /*< private >*/
     X86MachineClass parent_class;
@@ -278,12 +280,15 @@ extern const size_t pc_compat_1_4_len;
     { "qemu64-" TYPE_X86_CPU, "model-id", "QEMU Virtual CPU version " v, },\
     { "athlon-" TYPE_X86_CPU, "model-id", "QEMU Virtual CPU version " v, },
 
+// 关键就是 optsfn / initfn 两个函数
+// optsfn 会在 class_init 的时候调用
+// initfn 函数会被赋予给 MachineClass 这个类的 init 函数。然后在 qemu_init 里调用。是虚拟机的入口
 #define DEFINE_PC_MACHINE(suffix, namestr, initfn, optsfn) \
     static void pc_machine_##suffix##_class_init(ObjectClass *oc, void *data) \
     { \
-        MachineClass *mc = MACHINE_CLASS(oc); \
+        MachineClass *mc = MACHINE_CLASS(oc); \		/* 多态 */ \
         optsfn(mc); \
-        mc->init = initfn; \
+        mc->init = initfn; \	/* 关键，这里将 init 函数保存到了 mc 中，后续在 qemu_init() 里会调用的，是虚拟机的入口 */ \
     } \
     static const TypeInfo pc_machine_type_##suffix = { \
         .name       = namestr TYPE_MACHINE_SUFFIX, \

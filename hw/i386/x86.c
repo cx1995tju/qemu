@@ -123,13 +123,14 @@ void x86_cpu_new(X86MachineState *x86ms, int64_t apic_id, Error **errp)
 
     cpu = object_new(MACHINE(x86ms)->cpu_type);
 
-    object_property_set_uint(cpu, apic_id, "apic-id", &local_err);
-    object_property_set_bool(cpu, true, "realized", &local_err);
+    object_property_set_uint(cpu, apic_id, "apic-id", &local_err); // refer to: x86_cpu_properties, 这里设置了 apic_id
+    object_property_set_bool(cpu, true, "realized", &local_err); // 这里会创建 vcpu 线程 device_set_realized() -> x86_cpu_realizefn()  核心就是这里
 
     object_unref(cpu);
     error_propagate(errp, local_err);
 }
 
+// 对 vcpu 做初始化
 void x86_cpus_init(X86MachineState *x86ms, int default_cpu_version)
 {
     int i;
@@ -161,7 +162,9 @@ void x86_cpus_init(X86MachineState *x86ms, int default_cpu_version)
             x86_cpu_apic_id_from_index(x86ms, i);
     }
 
-    for (i = 0; i < ms->smp.cpus; i++) {
+    // 这里在实例化 vcpu 
+    // CPU 继承树：TYPE_OBJECT -> TYPE_DEVICE -> TYPE_CPU -> TYPE_X86_CPU
+    for (i = 0; i < ms->smp.cpus; i++) { // 每个 vcpu 一个线程
         x86_cpu_new(x86ms, possible_cpus->cpus[i].arch_id, &error_fatal);
     }
 }

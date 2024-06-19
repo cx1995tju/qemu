@@ -261,17 +261,17 @@ int qdev_device_help(QemuOpts *opts)
     GPtrArray *array;
     int i;
 
-    driver = qemu_opt_get(opts, "driver");
-    if (driver && is_help_option(driver)) {
+    driver = qemu_opt_get(opts, "driver"); // refer to: %qemu_device_opts
+    if (driver && is_help_option(driver)) { // 如果是 help 那么打印 help 信息, qemu -device help
         qdev_print_devinfos(false);
         return 1;
     }
 
-    if (!driver || !qemu_opt_has_help_opt(opts)) {
+    if (!driver || !qemu_opt_has_help_opt(opts)) { // 一般都是有driver参数，且k-v中没有包含 help 参数。那么就从这里出去了。
         return 0;
     }
 
-    if (!object_class_by_name(driver)) {
+    if (!object_class_by_name(driver)) { // dirver 没有注册。那么可能是别名，再找一次
         const char *typename = find_typename_by_alias(driver);
 
         if (typename) {
@@ -279,7 +279,8 @@ int qdev_device_help(QemuOpts *opts)
         }
     }
 
-    prop_list = qmp_device_list_properties(driver, &local_err);
+    // 将这个对象的所有属性都返回来了
+    prop_list = qmp_device_list_properties(driver, &local_err); // k=v 形式的参数参数应该都是作为 driver 这个 class 的属性注册的么。这里找属性，就是找对应的参数。
     if (local_err) {
         goto error;
     }
@@ -290,7 +291,7 @@ int qdev_device_help(QemuOpts *opts)
         qemu_printf("There are no options for %s.\n", driver);
     }
     array = g_ptr_array_new();
-    for (prop = prop_list; prop; prop = prop->next) {
+    for (prop = prop_list; prop; prop = prop->next) { // 逐个属性
         g_ptr_array_add(array,
                         object_property_help(prop->value->name,
                                              prop->value->type,
@@ -301,7 +302,7 @@ int qdev_device_help(QemuOpts *opts)
     for (i = 0; i < array->len; i++) {
         printf("%s\n", (char *)array->pdata[i]);
     }
-    g_ptr_array_set_free_func(array, g_free);
+    g_ptr_array_set_free_func(array, g_free); // 排序后为什么又释放了?
     g_ptr_array_free(array, true);
     qapi_free_ObjectPropertyInfoList(prop_list);
     return 1;
@@ -938,6 +939,7 @@ void qdev_machine_init(void)
     qdev_get_peripheral();
 }
 
+// qemu-options.hx 看 -device 的格式。其第一个参数就是 driver。
 QemuOptsList qemu_device_opts = {
     .name = "device",
     .implied_opt_name = "driver",

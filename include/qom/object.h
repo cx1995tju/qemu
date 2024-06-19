@@ -369,15 +369,15 @@ typedef void (ObjectPropertyInit)(Object *obj, ObjectProperty *prop);
 
 struct ObjectProperty
 {
-    gchar *name;
-    gchar *type;
+    gchar *name;	// 属性的 key
+    gchar *type;	// 属性的 类型
     gchar *description;
-    ObjectPropertyAccessor *get;
+    ObjectPropertyAccessor *get;	// 属性的操作函数
     ObjectPropertyAccessor *set;
     ObjectPropertyResolve *resolve;
     ObjectPropertyRelease *release;
     ObjectPropertyInit *init;
-    void *opaque;
+    void *opaque;	// 属性的 value
     QObject *defval;
 };
 
@@ -449,7 +449,7 @@ struct Object
  * @instance_size: The size of the object (derivative of #Object).  If
  *   @instance_size is 0, then the size of the object will be the size of the
  *   parent object.
- * @instance_init: This function is called to initialize an object.  The parent
+ * @instance_init: This function is called to initialize an object.  The parent			// 从上到下，基类肯定先初始化的
  *   class will have already been initialized so the type is only responsible
  *   for initializing its own members.
  * @instance_post_init: This function is called to finish initialization of
@@ -465,11 +465,11 @@ struct Object
  *   assumed to be the size of the parent class.  This allows a type to avoid
  *   implementing an explicit class type if they are not adding additional
  *   virtual functions.
- * @class_init: This function is called after all parent class initialization
+ * @class_init: This function is called after all parent class initialization	// refer to type_initialize
  *   has occurred to allow a class to set its default virtual method pointers.
  *   This is also the function to use to override virtual methods from a parent
  *   class.
- * @class_base_init: This function is called for all base classes after all
+ * @class_base_init: This function is called for all base classes after all 	// refer to type_initialize
  *   parent class initialization has occurred, but before the class itself
  *   is initialized.  This is the function to use to undo the effects of
  *   memcpy from the parent class to the descendants.
@@ -482,19 +482,19 @@ struct Object
  */
 struct TypeInfo
 {
-    const char *name;
-    const char *parent;
+    const char *name; // type 名字，在 hash 表中就是用这个来索引一个 type
+    const char *parent; // type 的继承关系
 
-    size_t instance_size;
-    void (*instance_init)(Object *obj);
-    void (*instance_post_init)(Object *obj);
-    void (*instance_finalize)(Object *obj);
+    size_t instance_size;			// 实例的大小
+    void (*instance_init)(Object *obj);		// 实例的构造函数，这两个函数在调用的时候都是递归调用的。即会从最高祖先类型的构造函数开始调用。 refer to: object_init_with_type() object_post_init_with_type()
+    void (*instance_post_init)(Object *obj);	// post init
+    void (*instance_finalize)(Object *obj);	// 实例的析构函数
 
     bool abstract;
     size_t class_size;
 
-    void (*class_init)(ObjectClass *klass, void *data);
-    void (*class_base_init)(ObjectClass *klass, void *data);
+    void (*class_init)(ObjectClass *klass, void *data); // 第一次使用这个 type 的时候，需要调用这个函数做一些初始化工作
+    void (*class_base_init)(ObjectClass *klass, void *data); // 用来初始化基类的。 也是第一次使用这个类型的时候调用的，会从该类型的 父类型开始，一直向上回溯，所有祖先都调用一遍.
     void *class_data;
 
     InterfaceInfo *interfaces;

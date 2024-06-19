@@ -343,8 +343,8 @@ int qemu_poll_ns(GPollFD *fds, guint nfds, int64_t timeout)
             tvsec = INT32_MAX;
         }
         ts.tv_sec = tvsec;
-        ts.tv_nsec = timeout % 1000000000LL;
-        return ppoll((struct pollfd *)fds, nfds, &ts, NULL);
+        ts.tv_nsec = timeout % 1000000000LL;	// 这里 timeout 如果是 0 的 话，应该立即就醒了？
+        return ppoll((struct pollfd *)fds, nfds, &ts, NULL); // poll 啦，没啥特殊的。fds 里返回的是 ready 的 fd
     }
 #else
     return g_poll(fds, nfds, qemu_timeout_ns_to_ms(timeout));
@@ -660,6 +660,7 @@ int64_t qemu_clock_get_ns(QEMUClockType type)
     }
 }
 
+// qemu 时钟机制？？？
 void init_clocks(QEMUTimerListNotifyCB *notify_cb)
 {
     QEMUClockType type;

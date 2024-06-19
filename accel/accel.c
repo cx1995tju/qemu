@@ -46,13 +46,14 @@ AccelClass *accel_find(const char *opt_name)
     return ac;
 }
 
+// %kvm_accel_type
 int accel_init_machine(AccelState *accel, MachineState *ms)
 {
     AccelClass *acc = ACCEL_GET_CLASS(accel);
     int ret;
     ms->accelerator = accel;
     *(acc->allowed) = true;
-    ret = acc->init_machine(ms);
+    ret = acc->init_machine(ms); // 关键是这里 %kvm_init
     if (ret < 0) {
         ms->accelerator = NULL;
         *(acc->allowed) = false;

@@ -1157,6 +1157,7 @@ void qemu_opts_validate(QemuOpts *opts, const QemuOptDesc *desc, Error **errp)
  * When @func() returns non-zero, break the loop and return that value.
  * Return zero when the loop completes.
  */
+// 为 list 上的每个 QemuOpts 调用 func。有一个出错立刻返回
 int qemu_opts_foreach(QemuOptsList *list, qemu_opts_loopfunc func,
                       void *opaque, Error **errp)
 {
@@ -1165,7 +1166,7 @@ int qemu_opts_foreach(QemuOptsList *list, qemu_opts_loopfunc func,
     int rc = 0;
 
     loc_push_none(&loc);
-    QTAILQ_FOREACH(opts, &list->head, next) {
+    QTAILQ_FOREACH(opts, &list->head, next) { // list 上的每个 QemuOpts 都来执行 func
         loc_restore(&opts->loc);
         rc = func(opaque, opts, errp);
         if (rc) {

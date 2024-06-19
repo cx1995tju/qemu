@@ -121,7 +121,7 @@ struct BHListSlice {
 typedef QSLIST_HEAD(, AioHandler) AioHandlerSList;
 
 struct AioContext {
-    GSource source;
+    GSource source; // 继承自 glib，自定义事件源必须的
 
     /* Used by AioContext users to protect from multi-threaded access.  */
     QemuRecMutex lock;

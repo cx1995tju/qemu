@@ -1654,7 +1654,7 @@ struct X86CPU {
     bool migratable;
     bool migrate_smi_count;
     bool max_features; /* Enable all supported features automatically */
-    uint32_t apic_id;
+    uint32_t apic_id; // %x86_cpu_new() 设置的
 
     /* Enables publishing of TSC increment and Local APIC bus frequencies to
      * the guest OS in CPUID page 0x40000010, the same way that VMWare does. */

@@ -159,6 +159,7 @@ typedef struct {
  *    Applies only to default memory backend, i.e., explicit memory backend
  *    wasn't used.
  */
+// TYPE_OBJECT -> TYPE_MACHINE -> TYPE_X86_MACHINE -> TYPE_PC_MACHINE -> pc_machine_type_##suffix
 struct MachineClass {
     /*< private >*/
     ObjectClass parent_class;
@@ -222,7 +223,7 @@ struct MachineClass {
                             Error **errp);
     CpuInstanceProperties (*cpu_index_to_instance_props)(MachineState *machine,
                                                          unsigned cpu_index);
-    const CPUArchIdList *(*possible_cpu_arch_ids)(MachineState *machine);
+    const CPUArchIdList *(*possible_cpu_arch_ids)(MachineState *machine); // %x86_possible_cpu_arch_id
     int64_t (*get_default_cpu_node_id)(const MachineState *ms, int idx);
     ram_addr_t (*fixup_ram_size)(ram_addr_t size);
 };
@@ -293,7 +294,7 @@ struct MachineState {
     char *kernel_filename;
     char *kernel_cmdline;
     char *initrd_filename;
-    const char *cpu_type;
+    const char *cpu_type; // %host-x86_64-cpu 即 X86_CPU_TYPE_NAME("host") host_x86_cpu_type_info
     AccelState *accelerator;
     CPUArchIdList *possible_cpus;
     CpuTopology smp;

@@ -294,6 +294,7 @@ static void replay_enable(const char *fname, int mode)
     replay_init_events();
 }
 
+// -icount 参数的解析
 void replay_configure(QemuOpts *opts)
 {
     const char *fname;

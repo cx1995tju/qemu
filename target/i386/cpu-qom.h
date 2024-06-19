@@ -24,7 +24,7 @@
 #include "qemu/notify.h"
 
 #ifdef TARGET_X86_64
-#define TYPE_X86_CPU "x86_64-cpu"
+#define TYPE_X86_CPU "x86_64-cpu" // x86_register_cpu_model_type 注册其子类
 #else
 #define TYPE_X86_CPU "i386-cpu"
 #endif
@@ -50,6 +50,7 @@ typedef struct X86CPUModel X86CPUModel;
  *
  * An x86 CPU model or family.
  */
+// TYPE_CPU -> TYPE_X86_CPU
 typedef struct X86CPUClass {
     /*< private >*/
     CPUClass parent_class;

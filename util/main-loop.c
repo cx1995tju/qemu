@@ -144,6 +144,9 @@ void qemu_notify_event(void)
 
 static GArray *gpollfds;
 
+// 主要将两个重要的事件源添加到 default context 中
+// qemu-aio-context: 主要用于处理块设备层的异步 IO 请求
+// io-handler: 默认的全局事件源。一般会使用 qemu_set_fd_handler() -> aio_set_fd_handler() 添加 fd 到这个事件源的
 int qemu_init_main_loop(Error **errp)
 {
     int ret;
@@ -157,18 +160,20 @@ int qemu_init_main_loop(Error **errp)
         return ret;
     }
 
+    // 创建了一个 glib 事件源
     qemu_aio_context = aio_context_new(&local_error);
     if (!qemu_aio_context) {
         error_propagate(errp, local_error);
         return -EMFILE;
     }
+    // qemu notify 机制
     qemu_notify_bh = qemu_bh_new(notify_event_cb, NULL);
-    gpollfds = g_array_new(FALSE, FALSE, sizeof(GPollFD));
-    src = aio_get_g_source(qemu_aio_context);
+    gpollfds = g_array_new(FALSE, FALSE, sizeof(GPollFD)); 
+    src = aio_get_g_source(qemu_aio_context); // 强制转换咯
     g_source_set_name(src, "aio-context");
-    g_source_attach(src, NULL);
+    g_source_attach(src, NULL); // 事件源 添加到 default context 中
     g_source_unref(src);
-    src = iohandler_get_g_source();
+    src = iohandler_get_g_source(); // 又一个 io-handler 事件源
     g_source_set_name(src, "io-handler");
     g_source_attach(src, NULL);
     g_source_unref(src);
@@ -188,7 +193,7 @@ static void glib_pollfds_fill(int64_t *cur_timeout)
     int64_t timeout_ns;
     int n;
 
-    g_main_context_prepare(context, &max_priority);
+    g_main_context_prepare(context, &max_priority); // 如果有事件源已经就绪了, 会设置 context->timeout 的。调用 glib 库就是了
 
     glib_pollfds_idx = gpollfds->len;
     n = glib_n_poll_fds;
@@ -197,17 +202,17 @@ static void glib_pollfds_fill(int64_t *cur_timeout)
         glib_n_poll_fds = n;
         g_array_set_size(gpollfds, glib_pollfds_idx + glib_n_poll_fds);
         pfds = &g_array_index(gpollfds, GPollFD, glib_pollfds_idx);
-        n = g_main_context_query(context, max_priority, &timeout, pfds,
+        n = g_main_context_query(context, max_priority, &timeout, pfds, // 调用 glib 库就是了, query 到的信息实际是保存到了 gpollfds里
                                  glib_n_poll_fds);
     } while (n != glib_n_poll_fds);
 
     if (timeout < 0) {
-        timeout_ns = -1;
+        timeout_ns = -1; // 归一化。代码好丑
     } else {
         timeout_ns = (int64_t)timeout * (int64_t)SCALE_MS;
     }
 
-    *cur_timeout = qemu_soonest_timeout(timeout_ns, *cur_timeout);
+    *cur_timeout = qemu_soonest_timeout(timeout_ns, *cur_timeout); // 获取最快 timeout 的
 }
 
 static void glib_pollfds_poll(void)
@@ -222,6 +227,8 @@ static void glib_pollfds_poll(void)
 
 #define MAX_MAIN_LOOP_SPIN (1000)
 
+// 在这里面自己实现了 glib 的事件循环的一次迭代
+// preapre -> polling -> check -> dispatch
 static int os_host_main_loop_wait(int64_t timeout)
 {
     GMainContext *context = g_main_context_default();
@@ -229,17 +236,21 @@ static int os_host_main_loop_wait(int64_t timeout)
 
     g_main_context_acquire(context);
 
-    glib_pollfds_fill(&timeout);
+    // 获取需要 poll 的fd, 保存在 default context 里
+    // 同时会拿到一个 timeout，这个timeout 有些事件已经 ready，timeout 时间后就需要处理。 这些事件是不需要 poll 的, 因为已经 ready 了
+    glib_pollfds_fill(&timeout); // *prepare* -> glib:g_main_context_prepare() glib:g_main_context_query()
 
     qemu_mutex_unlock_iothread();
     replay_mutex_unlock();
 
-    ret = qemu_poll_ns((GPollFD *)gpollfds->data, gpollfds->len, timeout);
+    // poll fd
+    ret = qemu_poll_ns((GPollFD *)gpollfds->data, gpollfds->len, timeout); // *polling* glib:g_poll(), blocking at here。被唤醒，说明有工作要干了。
 
     replay_mutex_lock();
-    qemu_mutex_lock_iothread();
+    qemu_mutex_lock_iothread(); // 大锁锁起来
 
-    glib_pollfds_poll();
+    // 被唤醒后，干活
+    glib_pollfds_poll(); // *check and dispatch* glib:g_main_context_check() glib:g_main_context_dispatch()
 
     g_main_context_release(context);
 
@@ -515,7 +526,7 @@ void main_loop_wait(int nonblocking)
                                       timerlistgroup_deadline_ns(
                                           &main_loop_tlg));
 
-    ret = os_host_main_loop_wait(timeout_ns);
+    ret = os_host_main_loop_wait(timeout_ns); // __HERE IT IS__
     mlpoll.state = ret < 0 ? MAIN_LOOP_POLL_ERR : MAIN_LOOP_POLL_OK;
     notifier_list_notify(&main_loop_poll_notifiers, &mlpoll);
 

@@ -393,7 +393,7 @@ PIIX3State *piix3_create(PCIBus *pci_bus, ISABus **isa_bus)
                      piix3, PIIX_NUM_PIRQS);
         pci_bus_set_route_irq_fn(pci_bus, piix3_route_intx_pin_to_irq);
     }
-    *isa_bus = ISA_BUS(qdev_get_child_bus(DEVICE(piix3), "isa.0"));
+    *isa_bus = ISA_BUS(qdev_get_child_bus(DEVICE(piix3), "isa.0"));	// 注意，这里 isa bus 是挂载在 pci 设备 piix3 下面的
 
     return piix3;
 }

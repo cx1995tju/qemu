@@ -53,7 +53,7 @@ static gboolean io_watch_poll_prepare(GSource *source,
     if (now_active) {
         iwp->src = qio_channel_create_watch(
             iwp->ioc, G_IO_IN | G_IO_ERR | G_IO_HUP | G_IO_NVAL);
-        g_source_set_callback(iwp->src, iwp->fd_read, iwp->opaque, NULL);
+        g_source_set_callback(iwp->src, iwp->fd_read, iwp->opaque, NULL); // 为事件源设置了 callback
         g_source_add_child_source(source, iwp->src);
         g_source_unref(iwp->src);
     } else {

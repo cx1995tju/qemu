@@ -6521,6 +6521,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
         goto out;
     }
 
+    // 检测宿主机的 CPU 特性能否支持要创建的 CPU 对象
     x86_cpu_filter_features(cpu, cpu->check_cpuid || cpu->enforce_cpuid);
 
     if (cpu->enforce_cpuid && x86_cpu_have_filtered_features(cpu)) {
@@ -6652,7 +6653,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
         x86_cpu_apic_create(cpu, &local_err);
         if (local_err != NULL) {
             goto out;
-        }
+       }
     }
 #endif
 
@@ -6685,7 +6686,7 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
     }
 #endif
 
-    qemu_init_vcpu(cs);
+    qemu_init_vcpu(cs);  // _HERE IT IS_  vcpu 线程就是这里创建
 
     /*
      * Most Intel and certain AMD CPUs support hyperthreading. Even though QEMU
@@ -6707,11 +6708,11 @@ static void x86_cpu_realizefn(DeviceState *dev, Error **errp)
             ht_warned = true;
     }
 
-    x86_cpu_apic_realize(cpu, &local_err);
+    x86_cpu_apic_realize(cpu, &local_err);		// __HERE IT iS__
     if (local_err != NULL) {
         goto out;
     }
-    cpu_reset(cs);
+    cpu_reset(cs); // __HERE IT iS__
 
     xcc->parent_realize(dev, &local_err);
 
@@ -6903,6 +6904,7 @@ static void x86_cpu_initfn(Object *obj)
     env->nr_nodes = 1;
     cpu_set_cpustate_pointers(cpu);
 
+    // 设置各种属性
     object_property_add(obj, "family", "int",
                         x86_cpuid_version_get_family,
                         x86_cpuid_version_set_family, NULL, NULL, NULL);
@@ -7123,7 +7125,7 @@ void x86_update_hflags(CPUX86State *env)
 static Property x86_cpu_properties[] = {
 #ifdef CONFIG_USER_ONLY
     /* apic_id = 0 by default for *-user, see commit 9886e834 */
-    DEFINE_PROP_UINT32("apic-id", X86CPU, apic_id, 0),
+    DEFINE_PROP_UINT32("apic-id", X86CPU, apic_id, 0),	// 给 X86CPU 这个 class 定义了一个 apic-id 属性，在设置这个属性的时候会设置 X86CPU 对应的实例的 apic_id 成员
     DEFINE_PROP_INT32("thread-id", X86CPU, thread_id, 0),
     DEFINE_PROP_INT32("core-id", X86CPU, core_id, 0),
     DEFINE_PROP_INT32("die-id", X86CPU, die_id, 0),
@@ -7234,13 +7236,14 @@ static void x86_cpu_common_class_init(ObjectClass *oc, void *data)
     CPUClass *cc = CPU_CLASS(oc);
     DeviceClass *dc = DEVICE_CLASS(oc);
 
-    device_class_set_parent_realize(dc, x86_cpu_realizefn,
+    device_class_set_parent_realize(dc, x86_cpu_realizefn, // 修改了 DeviceClass的 realize 函数, 这里是关键，后续就是通过 realize 来创建 vcpu thread 的
                                     &xcc->parent_realize);
     device_class_set_parent_unrealize(dc, x86_cpu_unrealizefn,
                                       &xcc->parent_unrealize);
     device_class_set_props(dc, x86_cpu_properties);
 
     device_class_set_parent_reset(dc, x86_cpu_reset, &xcc->parent_reset);
+    // 对父类做各种设置
     cc->reset_dump_flags = CPU_DUMP_FPU | CPU_DUMP_CCOP;
 
     cc->class_by_name = x86_cpu_class_by_name;

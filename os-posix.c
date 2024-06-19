@@ -85,6 +85,7 @@ void os_setup_signal_handling(void)
  * When running from the build tree this will be "$bindir/../pc-bios".
  * Otherwise, this is CONFIG_QEMU_DATADIR.
  */
+// refer to 启动参数: -bios /home/chengxin/mnt/temp5/chengxin-ansible/qemu/build/pc-bios/bios-256k.bin
 char *os_find_datadir(void)
 {
     g_autofree char *exec_dir = NULL;

@@ -867,6 +867,7 @@ static void machine_class_init(ObjectClass *oc, void *data)
 
 static void machine_class_base_init(ObjectClass *oc, void *data)
 {
+    // 继承我的类型，其不是 抽象类的化，就会做下面这些初始化
     if (!object_class_is_abstract(oc)) {
         MachineClass *mc = MACHINE_CLASS(oc);
         const char *cname = object_class_get_name(oc);
@@ -1092,14 +1093,14 @@ void machine_run_board_init(MachineState *machine)
 {
     MachineClass *machine_class = MACHINE_GET_CLASS(machine);
 
-    if (machine->ram_memdev_id) {
+    if (machine->ram_memdev_id) {	// 创建 machine 这个对象的时候设置的
         Object *o;
         o = object_resolve_path_type(machine->ram_memdev_id,
                                      TYPE_MEMORY_BACKEND, NULL);
         machine->ram = machine_consume_memdev(machine, MEMORY_BACKEND(o));
     }
 
-    if (machine->numa_state) {
+    if (machine->numa_state) { // 同上，构造函数中设置的
         numa_complete_configuration(machine);
         if (machine->numa_state->num_nodes) {
             machine_numa_finish_cpu_init(machine);
@@ -1137,7 +1138,8 @@ void machine_run_board_init(MachineState *machine)
         }
     }
 
-    machine_class->init(machine);
+    // TYPE_OBJECT -> TYPE_MACHINE -> TYPE_X86_MACHINE -> TYPE_PC_MACHINE -> pc_machine_type_##suffix
+    machine_class->init(machine);	// pc_init_##suffix() -> pc_init1()
 }
 
 static const TypeInfo machine_info = {

@@ -343,6 +343,7 @@ struct qemu_work_item;
  *
  * State of one CPU core or thread.
  */
+// TYPE_DEVICE -> TYPE_CPU
 struct CPUState {
     /*< private >*/
     DeviceState parent_obj;
@@ -355,7 +356,7 @@ struct CPUState {
 #ifdef _WIN32
     HANDLE hThread;
 #endif
-    int thread_id;
+    int thread_id; // 对应的 qemu 线程的 thread id
     bool running, has_waiter;
     struct QemuCond *halt_cond;
     bool thread_kicked;
